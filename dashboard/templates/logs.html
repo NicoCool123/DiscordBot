@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Live Logs{% endblock %}
+{% block page_title %}Live Logs{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="logsPage()">
+    <!-- Controls -->
+    <div class="card">
+        <div class="flex flex-wrap items-center gap-4">
+            <div class="flex items-center gap-2">
+                <label class="text-sm font-medium">Level:</label>
+                <select x-model="minLevel" @change="filterLogs()" class="input w-32">
+                    <option value="DEBUG">DEBUG</option>
+                    <option value="INFO">INFO</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="ERROR">ERROR</option>
+                    <option value="CRITICAL">CRITICAL</option>
+                </select>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <label class="text-sm font-medium">Auto-scroll:</label>
+                <input type="checkbox" x-model="autoScroll" class="rounded border-gray-300 text-discord-blurple focus:ring-discord-blurple">
+            </div>
+
+            <div class="flex-1"></div>
+
+            <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full" :class="connected ? 'bg-discord-green' : 'bg-discord-red'"></span>
+                <span class="text-sm" x-text="connected ? 'Connected' : 'Disconnected'"></span>
+            </div>
+
+            <button @click="clearLogs()" class="btn-secondary text-sm">Clear</button>
+            <button @click="reconnect()" class="btn-primary text-sm" x-show="!connected">Reconnect</button>
+        </div>
+    </div>
+
+    <!-- Log Output -->
+    <div class="card">
+        <div
+            class="bg-gray-900 rounded-lg p-4 h-[500px] overflow-y-auto font-mono text-sm scrollbar-thin"
+            x-ref="logContainer"
+        >
+            <template x-for="(log, index) in filteredLogs" :key="index">
+                <div class="py-1 border-b border-gray-800 last:border-0">
+                    <span class="text-gray-500" x-text="formatTimestamp(log.timestamp)"></span>
+                    <span
+                        class="ml-2 px-1.5 py-0.5 rounded text-xs font-medium"
+                        :class="{
+                            'bg-gray-700 text-gray-300': log.level === 'DEBUG',
+                            'bg-blue-900 text-blue-300': log.level === 'INFO',
+                            'bg-yellow-900 text-yellow-300': log.level === 'WARNING',
+                            'bg-red-900 text-red-300': log.level === 'ERROR',
+                            'bg-red-800 text-red-200': log.level === 'CRITICAL'
+                        }"
+                        x-text="log.level"
+                    ></span>
+                    <span class="ml-2 text-gray-100" x-text="log.message"></span>
+                </div>
+            </template>
+
+            <div x-show="filteredLogs.length === 0" class="text-center text-gray-500 py-8">
+                No logs to display
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function logsPage() {
+    return {
+        logs: [],
+        filteredLogs: [],
+        minLevel: 'INFO',
+        autoScroll: true,
+        connected: false,
+        ws: null,
+        levelPriority: { DEBUG: 0, INFO: 1, WARNING: 2, ERROR: 3, CRITICAL: 4 },
+
+        init() {
+            this.connect();
+        },
+
+        connect() {
+            const token = localStorage.getItem('access_token');
+            const wsUrl = `ws://${window.location.host}/ws/logs?token=${token}&level=${this.minLevel}`;
+
+            this.ws = new WebSocket(wsUrl);
+
+            this.ws.onopen = () => {
+                this.connected = true;
+                this.addLog({ level: 'INFO', message: 'Connected to log stream', timestamp: new Date().toISOString() });
+            };
+
+            this.ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'log') {
+                    this.addLog(data.data);
+                }
+            };
+
+            this.ws.onclose = () => {
+                this.connected = false;
+                this.addLog({ level: 'WARNING', message: 'Disconnected from log stream', timestamp: new Date().toISOString() });
+            };
+
+            this.ws.onerror = () => {
+                this.connected = false;
+            };
+        },
+
+        reconnect() {
+            if (this.ws) {
+                this.ws.close();
+            }
+            this.connect();
+        },
+
+        addLog(log) {
+            this.logs.push(log);
+            if (this.logs.length > 1000) {
+                this.logs.shift();
+            }
+            this.filterLogs();
+
+            if (this.autoScroll) {
+                this.$nextTick(() => {
+                    const container = this.$refs.logContainer;
+                    container.scrollTop = container.scrollHeight;
+                });
+            }
+        },
+
+        filterLogs() {
+            const minPriority = this.levelPriority[this.minLevel];
+            this.filteredLogs = this.logs.filter(log =>
+                this.levelPriority[log.level] >= minPriority
+            );
+        },
+
+        clearLogs() {
+            this.logs = [];
+            this.filteredLogs = [];
+        },
+
+        formatTimestamp(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString();
+        },
+
+        destroy() {
+            if (this.ws) {
+                this.ws.close();
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

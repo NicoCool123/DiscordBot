@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}Metrics{% endblock %}
+{% block page_title %}Server Metrics{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="metricsPage()">
+    <!-- Refresh Controls -->
+    <div class="flex items-center justify-between">
+        <p class="text-sm text-gray-500">Last updated: <span x-text="lastUpdated"></span></p>
+        <div class="flex items-center gap-4">
+            <label class="flex items-center gap-2">
+                <input type="checkbox" x-model="autoRefresh" class="rounded border-gray-300 text-discord-blurple focus:ring-discord-blurple">
+                <span class="text-sm">Auto-refresh (30s)</span>
+            </label>
+            <button @click="fetchMetrics()" class="btn-secondary text-sm">Refresh Now</button>
+        </div>
+    </div>
+
+    <!-- System Metrics -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <!-- CPU -->
+        <div class="card">
+            <h3 class="text-sm font-medium text-gray-500 mb-2">CPU Usage</h3>
+            <div class="flex items-end gap-2">
+                <span class="text-3xl font-bold" x-text="`${metrics.cpu}%`"></span>
+            </div>
+            <div class="mt-3 w-full bg-gray-200 dark:bg-discord-dark rounded-full h-2">
+                <div class="bg-discord-blurple h-2 rounded-full transition-all" :style="`width: ${metrics.cpu}%`"></div>
+            </div>
+        </div>
+
+        <!-- Memory -->
+        <div class="card">
+            <h3 class="text-sm font-medium text-gray-500 mb-2">Memory Usage</h3>
+            <div class="flex items-end gap-2">
+                <span class="text-3xl font-bold" x-text="`${metrics.memory}%`"></span>
+                <span class="text-sm text-gray-500" x-text="`${metrics.memoryMb} MB`"></span>
+            </div>
+            <div class="mt-3 w-full bg-gray-200 dark:bg-discord-dark rounded-full h-2">
+                <div class="bg-discord-green h-2 rounded-full transition-all" :style="`width: ${metrics.memory}%`"></div>
+            </div>
+        </div>
+
+        <!-- Disk -->
+        <div class="card">
+            <h3 class="text-sm font-medium text-gray-500 mb-2">Disk Usage</h3>
+            <div class="flex items-end gap-2">
+                <span class="text-3xl font-bold" x-text="`${metrics.disk}%`"></span>
+            </div>
+            <div class="mt-3 w-full bg-gray-200 dark:bg-discord-dark rounded-full h-2">
+                <div class="h-2 rounded-full transition-all" :class="metrics.disk > 80 ? 'bg-discord-red' : 'bg-discord-yellow'" :style="`width: ${metrics.disk}%`"></div>
+            </div>
+        </div>
+
+        <!-- Python Version -->
+        <div class="card">
+            <h3 class="text-sm font-medium text-gray-500 mb-2">Python Version</h3>
+            <span class="text-3xl font-bold" x-text="metrics.python"></span>
+            <p class="text-sm text-gray-500 mt-2" x-text="metrics.platform"></p>
+        </div>
+    </div>
+
+    <!-- Application Metrics -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- User Stats -->
+        <div class="card">
+            <h3 class="text-lg font-semibold mb-4">User Statistics</h3>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-discord-dark rounded-lg">
+                    <span>Total Users</span>
+                    <span class="font-semibold" x-text="metrics.users.total"></span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-discord-dark rounded-lg">
+                    <span>Active (24h)</span>
+                    <span class="font-semibold" x-text="metrics.users.active"></span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-discord-dark rounded-lg">
+                    <span>Total Guilds</span>
+                    <span class="font-semibold" x-text="metrics.guilds"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Audit Stats -->
+        <div class="card">
+            <h3 class="text-lg font-semibold mb-4">Activity Statistics</h3>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-discord-dark rounded-lg">
+                    <span>Events (24h)</span>
+                    <span class="font-semibold" x-text="metrics.events"></span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-discord-dark rounded-lg">
+                    <span>WebSocket Connections</span>
+                    <span class="font-semibold" x-text="metrics.wsConnections"></span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-discord-dark rounded-lg">
+                    <span>API Requests (last hour)</span>
+                    <span class="font-semibold" x-text="metrics.apiRequests"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function metricsPage() {
+    return {
+        metrics: {
+            cpu: 0,
+            memory: 0,
+            memoryMb: 0,
+            disk: 0,
+            python: '-',
+            platform: '-',
+            users: { total: 0, active: 0 },
+            guilds: 0,
+            events: 0,
+            wsConnections: 0,
+            apiRequests: 0,
+        },
+        lastUpdated: 'Never',
+        autoRefresh: true,
+        refreshInterval: null,
+
+        async init() {
+            await this.fetchMetrics();
+            this.startAutoRefresh();
+        },
+
+        async fetchMetrics() {
+            try {
+                const response = await fetch('/api/v1/dashboard/metrics', {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    this.metrics = {
+                        cpu: data.system.cpu_percent.toFixed(1),
+                        memory: data.system.memory_percent.toFixed(1),
+                        memoryMb: data.system.memory_used_mb.toFixed(0),
+                        disk: data.system.disk_percent.toFixed(1),
+                        python: data.system.python_version,
+                        platform: data.system.platform,
+                        users: {
+                            total: data.users.total,
+                            active: data.users.active_24h,
+                        },
+                        guilds: data.guilds.total,
+                        events: data.audit.events_24h,
+                        wsConnections: 0, // Would come from real metrics
+                        apiRequests: 0, // Would come from real metrics
+                    };
+                    this.lastUpdated = new Date().toLocaleTimeString();
+                }
+            } catch (error) {
+                console.error('Failed to fetch metrics:', error);
+            }
+        },
+
+        startAutoRefresh() {
+            this.$watch('autoRefresh', (value) => {
+                if (value) {
+                    this.refreshInterval = setInterval(() => this.fetchMetrics(), 30000);
+                } else if (this.refreshInterval) {
+                    clearInterval(this.refreshInterval);
+                }
+            });
+
+            if (this.autoRefresh) {
+                this.refreshInterval = setInterval(() => this.fetchMetrics(), 30000);
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

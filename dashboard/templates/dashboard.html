@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard Overview{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <!-- Servers -->
+        <div class="card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Servers</p>
+                    <p class="text-2xl font-bold" id="stat-guilds">-</p>
+                </div>
+                <div class="w-12 h-12 bg-discord-blurple/10 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-discord-blurple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users -->
+        <div class="card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Total Users</p>
+                    <p class="text-2xl font-bold" id="stat-users">-</p>
+                </div>
+                <div class="w-12 h-12 bg-discord-green/10 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-discord-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Latency -->
+        <div class="card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Latency</p>
+                    <p class="text-2xl font-bold" id="stat-latency">-</p>
+                </div>
+                <div class="w-12 h-12 bg-discord-yellow/10 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-discord-yellow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Uptime -->
+        <div class="card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Uptime</p>
+                    <p class="text-2xl font-bold" id="stat-uptime">-</p>
+                </div>
+                <div class="w-12 h-12 bg-purple-500/10 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Recent Activity -->
+        <div class="card">
+            <h3 class="text-lg font-semibold mb-4">Recent Activity</h3>
+            <div class="space-y-3" id="activity-list">
+                <div class="text-center text-gray-500 py-4">Loading...</div>
+            </div>
+        </div>
+
+        <!-- System Status -->
+        <div class="card">
+            <h3 class="text-lg font-semibold mb-4">System Status</h3>
+            <div class="space-y-4">
+                <!-- CPU -->
+                <div>
+                    <div class="flex justify-between text-sm mb-1">
+                        <span>CPU Usage</span>
+                        <span id="cpu-value">-</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-discord-dark rounded-full h-2">
+                        <div class="bg-discord-blurple h-2 rounded-full transition-all" id="cpu-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Memory -->
+                <div>
+                    <div class="flex justify-between text-sm mb-1">
+                        <span>Memory Usage</span>
+                        <span id="memory-value">-</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-discord-dark rounded-full h-2">
+                        <div class="bg-discord-green h-2 rounded-full transition-all" id="memory-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Disk -->
+                <div>
+                    <div class="flex justify-between text-sm mb-1">
+                        <span>Disk Usage</span>
+                        <span id="disk-value">-</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-discord-dark rounded-full h-2">
+                        <div class="bg-discord-yellow h-2 rounded-full transition-all" id="disk-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="card">
+        <h3 class="text-lg font-semibold mb-4">Quick Actions</h3>
+        <div class="flex flex-wrap gap-3">
+            <button onclick="reloadBot()" class="btn-primary">
+                <svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                Reload Bot
+            </button>
+            <button onclick="syncCommands()" class="btn-secondary">
+                <svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
+                </svg>
+                Sync Commands
+            </button>
+            <a href="/logs" class="btn-secondary">
+                <svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                View Logs
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Fetch and display dashboard data
+    async function fetchDashboardData() {
+        try {
+            // Fetch bot status
+            const statusResponse = await fetch('/api/v1/bot/status', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+            });
+            if (statusResponse.ok) {
+                const status = await statusResponse.json();
+                document.getElementById('stat-guilds').textContent = status.guild_count.toLocaleString();
+                document.getElementById('stat-users').textContent = status.user_count.toLocaleString();
+                document.getElementById('stat-latency').textContent = `${status.latency_ms.toFixed(0)}ms`;
+                document.getElementById('stat-uptime').textContent = formatUptime(status.uptime_seconds);
+
+                // Update status indicator
+                const indicator = document.getElementById('status-indicator');
+                const statusText = document.getElementById('status-text');
+                if (status.online) {
+                    indicator.className = 'w-2 h-2 rounded-full bg-discord-green';
+                    statusText.textContent = 'Online';
+                } else {
+                    indicator.className = 'w-2 h-2 rounded-full bg-discord-red';
+                    statusText.textContent = 'Offline';
+                }
+            }
+
+            // Fetch metrics
+            const metricsResponse = await fetch('/api/v1/dashboard/metrics', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+            });
+            if (metricsResponse.ok) {
+                const metrics = await metricsResponse.json();
+
+                document.getElementById('cpu-value').textContent = `${metrics.system.cpu_percent.toFixed(1)}%`;
+                document.getElementById('cpu-bar').style.width = `${metrics.system.cpu_percent}%`;
+
+                document.getElementById('memory-value').textContent = `${metrics.system.memory_percent.toFixed(1)}%`;
+                document.getElementById('memory-bar').style.width = `${metrics.system.memory_percent}%`;
+
+                document.getElementById('disk-value').textContent = `${metrics.system.disk_percent.toFixed(1)}%`;
+                document.getElementById('disk-bar').style.width = `${metrics.system.disk_percent}%`;
+            }
+
+            // Fetch activity
+            const activityResponse = await fetch('/api/v1/dashboard/activity?limit=5', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+            });
+            if (activityResponse.ok) {
+                const activity = await activityResponse.json();
+                const activityList = document.getElementById('activity-list');
+
+                if (activity.activity.length === 0) {
+                    activityList.innerHTML = '<div class="text-center text-gray-500 py-4">No recent activity</div>';
+                } else {
+                    activityList.innerHTML = activity.activity.map(item => `
+                        <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-discord-dark">
+                            <div class="w-2 h-2 rounded-full bg-discord-blurple"></div>
+                            <div class="flex-1">
+                                <p class="text-sm">${item.description}</p>
+                                <p class="text-xs text-gray-500">${formatTimestamp(item.timestamp)}</p>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            }
+        } catch (error) {
+            console.error('Failed to fetch dashboard data:', error);
+        }
+    }
+
+    function formatUptime(seconds) {
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor((seconds % 86400) / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+
+        if (days > 0) return `${days}d ${hours}h`;
+        if (hours > 0) return `${hours}h ${minutes}m`;
+        return `${minutes}m`;
+    }
+
+    function formatTimestamp(timestamp) {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diff = (now - date) / 1000;
+
+        if (diff < 60) return 'Just now';
+        if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+        return date.toLocaleDateString();
+    }
+
+    async function reloadBot() {
+        try {
+            const response = await fetch('/api/v1/bot/reload', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ sync_commands: false })
+            });
+
+            if (response.ok) {
+                alert('Bot reload requested successfully');
+            } else {
+                const error = await response.json();
+                alert(`Failed to reload bot: ${error.detail}`);
+            }
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+        }
+    }
+
+    async function syncCommands() {
+        try {
+            const response = await fetch('/api/v1/bot/reload', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ sync_commands: true })
+            });
+
+            if (response.ok) {
+                alert('Command sync requested successfully');
+            } else {
+                const error = await response.json();
+                alert(`Failed to sync commands: ${error.detail}`);
+            }
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+        }
+    }
+
+    // Initial fetch
+    fetchDashboardData();
+
+    // Refresh every 30 seconds
+    setInterval(fetchDashboardData, 30000);
+</script>
+{% endblock %}

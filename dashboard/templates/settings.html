@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Settings{% endblock %}
+{% block page_title %}Bot Settings{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl space-y-6" x-data="settingsForm()">
+    <!-- Guild Selector -->
+    <div class="card">
+        <h3 class="text-lg font-semibold mb-4">Select Server</h3>
+        <select x-model="selectedGuild" @change="loadSettings()" class="input">
+            <option value="">-- Select a server --</option>
+            <template x-for="guild in guilds" :key="guild.id">
+                <option :value="guild.id" x-text="guild.name"></option>
+            </template>
+        </select>
+    </div>
+
+    <!-- Settings Form -->
+    <div class="card" x-show="selectedGuild" x-cloak>
+        <h3 class="text-lg font-semibold mb-4">Server Settings</h3>
+
+        <form @submit.prevent="saveSettings" class="space-y-6">
+            <!-- Basic Settings -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="label">Command Prefix</label>
+                    <input type="text" x-model="settings.prefix" class="input" maxlength="5" placeholder="!">
+                </div>
+                <div>
+                    <label class="label">Language</label>
+                    <select x-model="settings.language" class="input">
+                        <option value="en">English</option>
+                        <option value="de">Deutsch</option>
+                        <option value="fr">Francais</option>
+                        <option value="es">Espanol</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Feature Toggles -->
+            <div class="space-y-4">
+                <h4 class="font-medium">Features</h4>
+
+                <label class="flex items-center gap-3">
+                    <input type="checkbox" x-model="settings.moderation_enabled" class="rounded border-gray-300 text-discord-blurple focus:ring-discord-blurple">
+                    <span>Enable Moderation</span>
+                </label>
+
+                <label class="flex items-center gap-3">
+                    <input type="checkbox" x-model="settings.logging_enabled" class="rounded border-gray-300 text-discord-blurple focus:ring-discord-blurple">
+                    <span>Enable Logging</span>
+                </label>
+
+                <label class="flex items-center gap-3">
+                    <input type="checkbox" x-model="settings.welcome_enabled" class="rounded border-gray-300 text-discord-blurple focus:ring-discord-blurple">
+                    <span>Enable Welcome Messages</span>
+                </label>
+            </div>
+
+            <!-- Channel Settings -->
+            <div class="space-y-4">
+                <h4 class="font-medium">Channels</h4>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="label">Log Channel ID</label>
+                        <input type="text" x-model="settings.log_channel_id" class="input" placeholder="Channel ID">
+                    </div>
+                    <div>
+                        <label class="label">Mod Log Channel ID</label>
+                        <input type="text" x-model="settings.mod_log_channel_id" class="input" placeholder="Channel ID">
+                    </div>
+                    <div>
+                        <label class="label">Welcome Channel ID</label>
+                        <input type="text" x-model="settings.welcome_channel_id" class="input" placeholder="Channel ID">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Welcome Message -->
+            <div x-show="settings.welcome_enabled">
+                <label class="label">Welcome Message</label>
+                <textarea x-model="settings.welcome_message" class="input" rows="3" placeholder="Welcome {user} to {server}!"></textarea>
+                <p class="text-xs text-gray-500 mt-1">Use {user} for username, {server} for server name</p>
+            </div>
+
+            <!-- Submit -->
+            <div class="flex justify-end gap-3">
+                <button type="button" @click="resetSettings()" class="btn-secondary">Reset</button>
+                <button type="submit" class="btn-primary" :disabled="saving">
+                    <span x-show="!saving">Save Settings</span>
+                    <span x-show="saving">Saving...</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Success/Error Messages -->
+    <div x-show="message" x-cloak class="p-4 rounded-lg" :class="messageType === 'success' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'">
+        <p x-text="message"></p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function settingsForm() {
+    return {
+        guilds: [],
+        selectedGuild: '',
+        settings: {
+            prefix: '!',
+            language: 'en',
+            moderation_enabled: true,
+            logging_enabled: true,
+            welcome_enabled: false,
+            log_channel_id: '',
+            mod_log_channel_id: '',
+            welcome_channel_id: '',
+            welcome_message: '',
+        },
+        originalSettings: {},
+        saving: false,
+        message: '',
+        messageType: '',
+
+        async init() {
+            // For demo, add some fake guilds
+            // In production, fetch from API
+            this.guilds = [
+                { id: '123456789', name: 'My Server' },
+                { id: '987654321', name: 'Another Server' },
+            ];
+        },
+
+        async loadSettings() {
+            if (!this.selectedGuild) return;
+
+            try {
+                const response = await fetch(`/api/v1/settings/${this.selectedGuild}`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    this.settings = { ...this.settings, ...data };
+                    this.originalSettings = { ...this.settings };
+                } else if (response.status === 404) {
+                    // No settings yet, use defaults
+                    this.resetSettings();
+                }
+            } catch (error) {
+                this.showMessage('Failed to load settings', 'error');
+            }
+        },
+
+        async saveSettings() {
+            this.saving = true;
+            this.message = '';
+
+            try {
+                const response = await fetch(`/api/v1/settings/${this.selectedGuild}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(this.settings)
+                });
+
+                if (response.ok) {
+                    this.originalSettings = { ...this.settings };
+                    this.showMessage('Settings saved successfully', 'success');
+                } else {
+                    const error = await response.json();
+                    this.showMessage(error.detail || 'Failed to save settings', 'error');
+                }
+            } catch (error) {
+                this.showMessage('Failed to save settings', 'error');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        resetSettings() {
+            this.settings = { ...this.originalSettings };
+        },
+
+        showMessage(text, type) {
+            this.message = text;
+            this.messageType = type;
+            setTimeout(() => { this.message = ''; }, 5000);
+        }
+    };
+}
+</script>
+{% endblock %}

@@ -1,0 +1,13 @@
+{
+  "name": "discord-bot-dashboard",
+  "version": "1.0.0",
+  "description": "Web Dashboard for Discord Bot",
+  "scripts": {
+    "build": "npx tailwindcss -i ./static/css/input.css -o ./static/css/main.css --minify",
+    "watch": "npx tailwindcss -i ./static/css/input.css -o ./static/css/main.css --watch",
+    "dev": "npx tailwindcss -i ./static/css/input.css -o ./static/css/main.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0"
+  }
+}
