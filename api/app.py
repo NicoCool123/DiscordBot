@@ -141,8 +141,8 @@ class Application:
             return RedirectResponse(url="/login")
 
         @self.app.get("/register")
-        async def register():
-            return RedirectResponse(url="/login")
+        async def register(request: Request):
+            return self.templates.TemplateResponse("register.html", {"request": request})
 
     def run(self) -> None:
         """Run the app via uvicorn."""

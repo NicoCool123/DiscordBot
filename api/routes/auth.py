@@ -113,20 +113,9 @@ async def login(
     credentials: UserLogin,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict:
-    """Authenticate user and return tokens.
+    """Authenticate user and return tokens with proper logging and MFA handling."""
 
-    Args:
-        request: FastAPI request
-        credentials: Login credentials
-        db: Database session
-
-    Returns:
-        Access and refresh tokens
-
-    Raises:
-        HTTPException: If credentials are invalid
-    """
-    # Find user by username or email
+    # --- Schritt 1: Benutzer suchen ---
     result = await db.execute(
         select(User).where(
             or_(
@@ -137,8 +126,8 @@ async def login(
     )
     user = result.scalar_one_or_none()
 
-    if user is None or not verify_password(credentials.password, user.password_hash):
-        # Log failed attempt
+    if user is None:
+        # Kein Benutzer gefunden → Audit Log + 401
         audit = AuditLog.create(
             action=AuditActions.LOGIN_FAILED,
             resource="auth",
@@ -147,34 +136,51 @@ async def login(
         )
         db.add(audit)
         await db.commit()
-
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
+            detail="Invalid username or password"
         )
 
+    # --- Schritt 2: Passwort prüfen ---
+    if not verify_password(credentials.password, user.password_hash):
+        audit = AuditLog.create(
+            action=AuditActions.LOGIN_FAILED,
+            resource="auth",
+            user_id=user.id,
+            details={"username": credentials.username, "reason": "wrong_password"},
+            ip_address=request.client.host if request.client else None,
+        )
+        db.add(audit)
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password"
+        )
+
+    # --- Schritt 3: Ist der Benutzer aktiv? ---
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is disabled",
+            detail="Account is disabled"
         )
 
-    # Check if MFA is required
+    # --- Schritt 4: MFA prüfen ---
     if user.mfa_enabled:
+        # MFA erforderlich → kein Token, Frontend muss /login/mfa aufrufen
         raise HTTPException(
             status_code=status.HTTP_428_PRECONDITION_REQUIRED,
             detail="MFA verification required",
-            headers={"X-MFA-Required": "true"},
+            headers={"X-MFA-Required": "true"}
         )
 
-    # Update last login
+    # --- Schritt 5: Letztes Login aktualisieren ---
     user.last_login = datetime.utcnow()
 
-    # Create tokens
+    # --- Schritt 6: Tokens erstellen ---
     access_token = create_access_token(user.id)
     refresh_token = create_refresh_token(user.id)
 
-    # Log successful login
+    # --- Schritt 7: Audit Log ---
     audit = AuditLog.create(
         action=AuditActions.LOGIN,
         resource="auth",
@@ -184,6 +190,7 @@ async def login(
     db.add(audit)
     await db.commit()
 
+    # --- Schritt 8: Antwort ---
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,

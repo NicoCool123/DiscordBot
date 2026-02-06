@@ -1,5 +1,6 @@
 """Dashboard API routes."""
 
+import os
 import platform
 import sys
 from datetime import datetime, timedelta
@@ -16,20 +17,10 @@ from api.core.security import require_permission
 from api.models.audit_log import AuditLog
 from api.models.bot_settings import BotSettings
 from api.models.user import User
-from fastapi import APIRouter, Request
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-from fastapi import FastAPI
 
 router = APIRouter()
 
 
-templates = Jinja2Templates(directory="../../dashboard/templates")
-
-@router.get("/dashboard")
-async def dashboard_page(request: Request):
-    """Render the dashboard HTML page."""
-    return templates.TemplateResponse("dashboard.html", {"request": request})
 @router.get("/metrics")
 @limit_api()
 async def get_dashboard_metrics(
@@ -87,7 +78,7 @@ async def get_dashboard_metrics(
             "cpu_percent": psutil.cpu_percent(),
             "memory_used_mb": memory_info.rss / 1024 / 1024,
             "memory_percent": psutil.virtual_memory().percent,
-            "disk_percent": psutil.disk_usage("/").percent,
+            "disk_percent": psutil.disk_usage(os.path.abspath(os.sep)).percent,
             "python_version": sys.version.split()[0],
             "platform": platform.system(),
         },

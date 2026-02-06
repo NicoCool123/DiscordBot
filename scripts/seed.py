@@ -17,12 +17,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import selectinload
 
 from api.core.config import settings
 from api.core.database import Base
 from api.core.security import get_password_hash
 from api.models.module import DEFAULT_MODULES, Module
-from api.models.role import DEFAULT_ROLES, Role
+from api.models.role import DEFAULT_ROLES, Role, UserRole
 from api.models.user import User
 
 
@@ -97,9 +98,10 @@ async def seed_admin_user(
         session.add(admin)
         await session.flush()
 
-        # Assign admin role
+        # Assign admin role via association table
         if "admin" in roles:
-            admin.roles.append(roles["admin"])
+            user_role = UserRole(user_id=admin.id, role_id=roles["admin"].id)
+            session.add(user_role)
 
         print(f"  Created admin user (username: admin, password: {password})")
     else:
@@ -112,6 +114,10 @@ async def main(admin_password: str) -> None:
 
     engine = create_async_engine(settings.database_url, echo=False)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
+
+    # Create tables if they don't exist
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
     async with async_session() as session:
         try:

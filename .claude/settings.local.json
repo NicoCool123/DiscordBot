@@ -12,7 +12,10 @@
       "Bash(python3:*)",
       "Bash(pip3 show:*)",
       "Bash(/mnt/c/Users/Nicolas/AppData/Local/Programs/Python/Python313/python.exe:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(powershell.exe -Command \"Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue | Select-Object OwningProcess | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }\")",
+      "Bash(powershell.exe:*)",
+      "Bash(*)"
     ]
   }
 }

@@ -1,22 +1,31 @@
 import os
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Annotated
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy import select, or_
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.config import settings
-from api.core.database import close_db, init_db
-from api.core.rate_limiter import limiter
+from api.core.database import close_db, init_db, get_db
+from api.core.rate_limiter import limiter, limit_auth
+from api.core.security import get_password_hash
+from api.models import AuditLog, User
+from api.models.audit_log import AuditActions
 from api.routes import api_router
-from api.websocket.logs import router as logs_ws_router
+from api.schemas import UserResponse, UserCreate
+from api.websocket import status
+from api.websocket.logs import router as logs_ws_router, router
 from api.websocket.status import router as status_ws_router
 from fastapi.templating import Jinja2Templates
+
+from bot.main import main
 
 # ----------------------
 # Base directory & templates
@@ -142,22 +151,77 @@ async def metrics_page(request: Request):
 async def logout_page():
     return RedirectResponse(url="/login")
 
-@app.get("/register")
-async def register_page():
-    return RedirectResponse(url="/login")
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@limit_auth("3/minute")  # optional, für Rate-Limiting
+async def register(
+    request: Request,
+    user_data: UserCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> User:
+    """
+    Register a new user.
 
-# ----------------------
-# Run Uvicorn
-# ----------------------
-def main() -> None:
-    import uvicorn
-    uvicorn.run(
-        "api.main:app",
-        host=settings.api_host,
-        port=settings.api_port,
-        reload=False,      # kein reload = keine extra Logs
-        log_level="warning" # nur warnings/errors
+    Args:
+        request: FastAPI request object
+        user_data: UserCreate schema (username, email, password)
+        db: Database session
+
+    Returns:
+        Created User object
+
+    Raises:
+        HTTPException: If username/email already exists
+    """
+
+    # --- Schritt 1: Benutzer prüfen ---
+    result = await db.execute(
+        select(User).where(
+            or_(
+                User.username == user_data.username.lower(),
+                User.email == user_data.email.lower(),
+            )
+        )
     )
+    existing_user = result.scalar_one_or_none()
+
+    if existing_user:
+        if existing_user.username == user_data.username.lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username already registered",
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered",
+            )
+
+    # --- Schritt 2: Benutzer anlegen ---
+    user = User(
+        username=user_data.username.lower(),
+        email=user_data.email.lower(),
+        password_hash=get_password_hash(user_data.password),
+        is_active=True,
+        is_superuser=False,
+    )
+
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    # --- Schritt 3: Audit-Log ---
+    audit = AuditLog.create(
+        action=AuditActions.USER_CREATE,
+        resource="user",
+        user_id=user.id,
+        resource_id=str(user.id),
+        ip_address=request.client.host if request.client else None,
+    )
+    db.add(audit)
+    await db.commit()
+
+    # --- Schritt 4: Rückgabe ---
+    return user
 
 if __name__ == "__main__":
     main()
