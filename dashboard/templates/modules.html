@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Modules{% endblock %}
+{% block page_title %}Module Management{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="modulesPage()">
+    <!-- Module Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <template x-for="module in modules" :key="module.name">
+            <div class="card">
+                <div class="flex items-start justify-between mb-4">
+                    <div>
+                        <h3 class="font-semibold" x-text="module.display_name"></h3>
+                        <span class="badge" :class="module.is_enabled ? 'badge-success' : 'badge-danger'" x-text="module.is_enabled ? 'Enabled' : 'Disabled'"></span>
+                    </div>
+                    <span class="badge badge-info" x-text="module.category"></span>
+                </div>
+
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4" x-text="module.description || 'No description'"></p>
+
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span x-show="module.is_core" class="text-xs text-gray-500">Core Module</span>
+                    </div>
+                    <button
+                        @click="toggleModule(module)"
+                        :disabled="module.is_core || loading === module.name"
+                        class="btn text-sm"
+                        :class="module.is_enabled ? 'btn-danger' : 'btn-success'"
+                    >
+                        <span x-show="loading !== module.name" x-text="module.is_enabled ? 'Disable' : 'Enable'"></span>
+                        <span x-show="loading === module.name">...</span>
+                    </button>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <!-- Empty State -->
+    <div x-show="modules.length === 0" class="card text-center py-12">
+        <svg class="w-12 h-12 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"/>
+        </svg>
+        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">No modules found</h3>
+        <p class="text-gray-500">Modules will appear here once configured.</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function modulesPage() {
+    return {
+        modules: [],
+        loading: null,
+
+        async init() {
+            await this.fetchModules();
+        },
+
+        async fetchModules() {
+            try {
+                const response = await fetch('/api/v1/bot/modules', {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    this.modules = data.modules;
+                }
+            } catch (error) {
+                console.error('Failed to fetch modules:', error);
+            }
+        },
+
+        async toggleModule(module) {
+            this.loading = module.name;
+
+            try {
+                const endpoint = module.is_enabled ? '/api/v1/bot/module/disable' : '/api/v1/bot/module/enable';
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ module_name: module.name })
+                });
+
+                if (response.ok) {
+                    module.is_enabled = !module.is_enabled;
+                } else {
+                    const error = await response.json();
+                    alert(error.detail || 'Failed to toggle module');
+                }
+            } catch (error) {
+                alert('Failed to toggle module');
+            } finally {
+                this.loading = null;
+            }
+        }
+    };
+}
+</script>
+{% endblock %}
