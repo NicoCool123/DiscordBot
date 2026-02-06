@@ -45,7 +45,7 @@ class BotSettings(BaseSettings):
     rcon_password: str = Field(default="", description="RCON password")
 
     # Feature Flags
-    debug: bool = Field(default=False, description="Debug mode")
+    debug: bool = Field(default=False, description="Debug mode", validation_alias="NOT_DEBUG")
 
     @property
     def is_production(self) -> bool:
