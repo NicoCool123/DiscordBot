@@ -16,10 +16,20 @@ from api.core.security import require_permission
 from api.models.audit_log import AuditLog
 from api.models.bot_settings import BotSettings
 from api.models.user import User
+from fastapi import APIRouter, Request
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI
 
 router = APIRouter()
 
 
+templates = Jinja2Templates(directory="../../dashboard/templates")
+
+@router.get("/dashboard")
+async def dashboard_page(request: Request):
+    """Render the dashboard HTML page."""
+    return templates.TemplateResponse("dashboard.html", {"request": request})
 @router.get("/metrics")
 @limit_api()
 async def get_dashboard_metrics(

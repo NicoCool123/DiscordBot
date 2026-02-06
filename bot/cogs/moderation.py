@@ -4,7 +4,8 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import discord
-from discord import SlashCommandGroup
+from discord.ext import commands, tasks
+from discord.commands import SlashCommandGroup, option
 from discord.ext import commands
 
 from bot.services.logger import get_logger
