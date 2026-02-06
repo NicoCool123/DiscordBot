@@ -1,5 +1,3 @@
-"""Tests for bot configuration."""
-
 import os
 import pytest
 from unittest.mock import patch
@@ -7,6 +5,24 @@ from unittest.mock import patch
 
 class TestBotConfig:
     """Tests for bot configuration loading."""
+
+    @pytest.fixture(autouse=True)
+    def clean_env(self, monkeypatch):
+        # Entfernt alle Umgebungsvariablen, die Settings beeinflussen könnten
+        keys = [
+            "DEBUG",
+            "DISCORD_PREFIX",
+            "API_URL",
+            "RCON_ENABLED",
+            "LOG_LEVEL",
+            "LOG_FORMAT",
+            "DATABASE_URL",
+        ]
+        for key in keys:
+            monkeypatch.delenv(key, raising=False)
+
+        # .env Datei vollständig deaktivieren
+        monkeypatch.setenv("Pydantic_env_file", "")
 
     def test_config_loads_from_env(self):
         env = {
@@ -23,17 +39,18 @@ class TestBotConfig:
                 discord_token="test-token",
                 bot_api_key="test-api-key",
             )
+
             assert settings.discord_token == "test-token"
             assert settings.bot_api_key == "test-api-key"
 
     def test_config_defaults(self):
-        settings_data = {
-            "discord_token": "test-token",
-            "bot_api_key": "test-api-key",
-        }
         from bot.config import BotSettings
 
-        settings = BotSettings(**settings_data)
+        settings = BotSettings(
+            discord_token="test-token",
+            bot_api_key="test-api-key",
+        )
+
         assert settings.discord_prefix == "!"
         assert settings.api_url == "http://localhost:8000"
         assert settings.debug is False

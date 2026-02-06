@@ -27,7 +27,7 @@ class BotSettings(BaseSettings):
     api_url: str = Field(default="http://localhost:8000", description="Backend API URL")
     bot_api_key: str = Field(..., description="API key for bot-backend communication")
 
-    # Database (direct connection for bot if needed)
+    # Database
     database_url: str = Field(
         default="postgresql+asyncpg://postgres:password@localhost:5432/discord_bot",
         description="Database connection URL",
@@ -38,14 +38,18 @@ class BotSettings(BaseSettings):
     log_format: str = Field(default="json", description="Log format: json or text")
     log_file: Optional[str] = Field(default=None, description="Log file path")
 
-    # Minecraft RCON (optional)
+    # Minecraft RCON
     rcon_enabled: bool = Field(default=False, description="Enable RCON integration")
     rcon_host: str = Field(default="localhost", description="RCON server host")
     rcon_port: int = Field(default=25575, description="RCON server port")
     rcon_password: str = Field(default="", description="RCON password")
 
     # Feature Flags
-    debug: bool = Field(default=False, description="Debug mode", validation_alias="NOT_DEBUG")
+    debug: bool = Field(
+        default=False,
+        description="Debug mode",
+        env="BOT_DEBUG"   # <--- FIXED
+    )
 
     @property
     def is_production(self) -> bool:
@@ -58,9 +62,8 @@ def get_settings() -> BotSettings:
     """Get cached settings instance."""
     return BotSettings()
 
-load_dotenv()  # lädt .env Datei in die Umgebung
 
+load_dotenv()  # Load .env
 print("DISCORD_TOKEN:", os.getenv("DISCORD_TOKEN"))
-
 
 settings = get_settings()
