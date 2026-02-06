@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
-from jose import JWTError
+from jwt.exceptions import PyJWTError
 
 from api.core.config import settings
 from api.core.jwt_handler import verify_token

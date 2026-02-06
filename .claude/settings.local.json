@@ -5,7 +5,14 @@
       "Bash(git -C /mnt/c/Users/Nicolas/PycharmProjects/DiscordBot log --oneline --all)",
       "Bash(wc:*)",
       "Bash(grep:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(ls:*)",
+      "Bash(python -c:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(pip3 show:*)",
+      "Bash(/mnt/c/Users/Nicolas/AppData/Local/Programs/Python/Python313/python.exe:*)",
+      "WebSearch"
     ]
   }
 }

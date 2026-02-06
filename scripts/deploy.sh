@@ -156,17 +156,17 @@ do_deploy() {
     pip install --upgrade pip
     pip install -r requirements.txt
 
-    # Create .env.example if it doesn't exist
-    if [ ! -f .env.example ]; then
+    # Create .env if it doesn't exist
+    if [ ! -f .env ]; then
         log_info "Creating .env from template..."
-        cp .env.example.example .env.example
+        cp .env.example .env
         # Generate secrets
         JWT_SECRET=$(openssl rand -hex 32)
         SECRET_KEY=$(openssl rand -hex 32)
         BOT_API_KEY=$(openssl rand -hex 32)
-        sed -i "s/your-super-secret-jwt-key-change-this/${JWT_SECRET}/" .env.example
-        sed -i "s/your-super-secret-app-key-change-this/${SECRET_KEY}/" .env.example
-        sed -i "s/your-bot-api-key-change-this/${BOT_API_KEY}/" .env.example
+        sed -i "s/your-super-secret-jwt-key-change-this/${JWT_SECRET}/" .env
+        sed -i "s/your-super-secret-app-key-change-this/${SECRET_KEY}/" .env
+        sed -i "s/your-bot-api-key-change-this/${BOT_API_KEY}/" .env
         log_warn "Generated secrets in .env - review and update other values!"
     fi
 

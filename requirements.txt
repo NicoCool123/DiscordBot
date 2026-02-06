@@ -1,5 +1,5 @@
 # Discord Bot
-py-cord>=2.6.0
+py-cord>=2.7.0
 
 # FastAPI & Web
 fastapi>=0.109.0
@@ -11,8 +11,8 @@ httpx>=0.26.0
 websockets>=12.0
 
 # Database
-sqlalchemy[asyncio]>=2.0.25
-asyncpg>=0.29.0
+sqlalchemy[asyncio]>=2.0.36
+asyncpg>=0.30.0
 alembic>=1.13.0
 redis>=5.0.0
 
@@ -22,8 +22,8 @@ pydantic-settings>=2.1.0
 python-dotenv>=1.0.0
 
 # Security & Auth
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
+PyJWT>=2.8.0
+bcrypt>=4.2.0
 pyotp>=2.9.0
 qrcode[pil]>=7.4.0
 email-validator>=2.1.0

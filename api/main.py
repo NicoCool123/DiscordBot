@@ -5,7 +5,8 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -65,6 +66,11 @@ app = FastAPI(
 )
 
 # ----------------------
+# Static files
+# ----------------------
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "dashboard", "static")), name="static")
+
+# ----------------------
 # Middleware
 # ----------------------
 app.add_middleware(
@@ -98,12 +104,47 @@ app.include_router(status_ws_router, prefix="/ws", tags=["WebSocket"])
 # Root & health
 # ----------------------
 @app.get("/")
-async def root() -> dict:
-    return {"name": settings.app_name, "version": settings.app_version, "status": "running"}
+async def root():
+    return RedirectResponse(url="/dashboard")
 
 @app.get("/health")
 async def health() -> dict:
     return {"status": "healthy"}
+
+# ----------------------
+# Dashboard page routes
+# ----------------------
+@app.get("/dashboard")
+async def dashboard_page(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request, "active_page": "dashboard"})
+
+@app.get("/login")
+async def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.get("/settings")
+async def settings_page(request: Request):
+    return templates.TemplateResponse("settings.html", {"request": request, "active_page": "settings"})
+
+@app.get("/modules")
+async def modules_page(request: Request):
+    return templates.TemplateResponse("modules.html", {"request": request, "active_page": "modules"})
+
+@app.get("/logs")
+async def logs_page(request: Request):
+    return templates.TemplateResponse("logs.html", {"request": request, "active_page": "logs"})
+
+@app.get("/metrics")
+async def metrics_page(request: Request):
+    return templates.TemplateResponse("metrics.html", {"request": request, "active_page": "metrics"})
+
+@app.get("/logout")
+async def logout_page():
+    return RedirectResponse(url="/login")
+
+@app.get("/register")
+async def register_page():
+    return RedirectResponse(url="/login")
 
 # ----------------------
 # Run Uvicorn

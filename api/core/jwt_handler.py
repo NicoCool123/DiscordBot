@@ -3,7 +3,8 @@
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError
 from pydantic import ValidationError
 
 from api.core.config import settings
@@ -108,7 +109,7 @@ def verify_token(token: str, token_type: str = "access") -> Optional[TokenPayloa
             type=payload.get("type"),
         )
 
-    except (JWTError, ValidationError):
+    except (PyJWTError, ValidationError):
         return None
 
 
@@ -122,14 +123,13 @@ def decode_token(token: str) -> Optional[dict[str, Any]]:
         Token payload as dictionary, or None if invalid
     """
     try:
-        # Decode without verification
         return jwt.decode(
             token,
             settings.jwt_secret_key,
             algorithms=[settings.jwt_algorithm],
             options={"verify_signature": False},
         )
-    except JWTError:
+    except PyJWTError:
         return None
 
 

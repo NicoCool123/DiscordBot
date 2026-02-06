@@ -1,10 +1,11 @@
+import os
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from slowapi import _rate_limit_exceeded_handler
@@ -16,6 +17,8 @@ from api.core.rate_limiter import limiter
 from api.routes import api_router
 from api.websocket.logs import router as logs_ws_router
 from api.websocket.status import router as status_ws_router
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class Application:
@@ -33,18 +36,18 @@ class Application:
             openapi_url="/openapi.json" if settings.debug else None,
             lifespan=self.lifespan,
         )
-        self.templates = Jinja2Templates(directory="../dashboard/templates")
+        self.templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "dashboard", "templates"))
         self._setup_static_files()
         self._setup_middlewares()
         self._setup_exception_handlers()
         self._register_routes()
 
-    logging.basicConfig(
-        level=getattr(logging, settings.log_level.upper()),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
-    # SQLAlchemy cleaner
-    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    def _configure_logging(self) -> None:
+        logging.basicConfig(
+            level=getattr(logging, settings.log_level.upper()),
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
+        logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
     async def lifespan(self, app: FastAPI) -> AsyncGenerator:
         """Handles startup and shutdown."""
@@ -62,7 +65,7 @@ class Application:
         self.logger.info("Shutdown complete")
 
     def _setup_static_files(self) -> None:
-        self.app.mount("/static", StaticFiles(directory="../dashboard/static"), name="static")
+        self.app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "dashboard", "static")), name="static")
 
     def _setup_middlewares(self) -> None:
         # CORS
@@ -98,20 +101,48 @@ class Application:
         self.app.include_router(logs_ws_router, prefix="/ws", tags=["WebSocket"])
         self.app.include_router(status_ws_router, prefix="/ws", tags=["WebSocket"])
 
-        # Dashboard
-        @self.app.get("/dashboard")
-        async def dashboard(request: Request):
-            return self.templates.TemplateResponse("index.html", {"request": request})
-
         # Root
         @self.app.get("/")
-        async def root() -> dict:
-            return {"name": settings.app_name, "version": settings.app_version, "status": "running"}
+        async def root():
+            return RedirectResponse(url="/dashboard")
 
         # Health check
         @self.app.get("/health")
         async def health() -> dict:
             return {"status": "healthy"}
+
+        # Dashboard pages
+        @self.app.get("/dashboard")
+        async def dashboard(request: Request):
+            return self.templates.TemplateResponse("dashboard.html", {"request": request, "active_page": "dashboard"})
+
+        @self.app.get("/login")
+        async def login(request: Request):
+            return self.templates.TemplateResponse("login.html", {"request": request})
+
+        @self.app.get("/settings")
+        async def settings_page(request: Request):
+            return self.templates.TemplateResponse("settings.html", {"request": request, "active_page": "settings"})
+
+        @self.app.get("/modules")
+        async def modules(request: Request):
+            return self.templates.TemplateResponse("modules.html", {"request": request, "active_page": "modules"})
+
+        @self.app.get("/logs")
+        async def logs(request: Request):
+            return self.templates.TemplateResponse("logs.html", {"request": request, "active_page": "logs"})
+
+        @self.app.get("/metrics")
+        async def metrics(request: Request):
+            return self.templates.TemplateResponse("metrics.html", {"request": request, "active_page": "metrics"})
+
+        @self.app.get("/logout")
+        async def logout():
+            return RedirectResponse(url="/login")
+
+        @self.app.get("/register")
+        async def register():
+            return RedirectResponse(url="/login")
 
     def run(self) -> None:
         """Run the app via uvicorn."""
