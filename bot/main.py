@@ -176,18 +176,18 @@ class DiscordBot(commands.Bot):
         await ctx.send("An unexpected error occurred. Please try again later.")
 
     async def on_application_command_error(
-        self, ctx: discord.ApplicationContext, error: discord.DiscordException
+            self, interaction: discord.Interaction, error: discord.DiscordException
     ) -> None:
         """Global error handler for slash commands."""
         if isinstance(error, discord.errors.CheckFailure):
-            await ctx.respond(
+            await interaction.response.send_message(
                 "You don't have permission to use this command.",
                 ephemeral=True,
             )
             return
 
         logger.error(f"Slash command error: {error}", exc_info=error)
-        await ctx.respond(
+        await interaction.response.send_message(
             "An unexpected error occurred. Please try again later.",
             ephemeral=True,
         )
