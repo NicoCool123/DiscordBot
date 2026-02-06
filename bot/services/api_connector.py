@@ -19,6 +19,18 @@ class APIError(Exception):
 
 
 class APIConnector:
+
+    async def get_session(self) -> aiohttp.ClientSession:
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession(
+                headers={
+                    "X-API-Key": self.api_key,
+                    "Content-Type": "application/json",
+                    "User-Agent": "DiscordBot/1.0",
+                },
+                timeout=aiohttp.ClientTimeout(total=30),
+            )
+        return self._session
     """Handles secure communication between bot and backend API."""
 
     def __init__(self, base_url: str, api_key: str):
