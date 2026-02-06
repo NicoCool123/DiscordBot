@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /mnt/c/Users/Nicolas/PycharmProjects/DiscordBot log --oneline -20)",
+      "Bash(git -C /mnt/c/Users/Nicolas/PycharmProjects/DiscordBot log --oneline --all)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(chmod:*)"
+    ]
+  }
+}
