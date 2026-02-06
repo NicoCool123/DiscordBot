@@ -56,3 +56,32 @@ async def get_current_superuser(current_user: Annotated[User, Depends(get_curren
     if not current_user.is_superuser:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
     return current_user
+
+async def get_api_key_or_user(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    api_key: Annotated[Optional[str], Depends(api_key_header)] = None,
+    credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(bearer_scheme)] = None,
+):
+    """
+    Liefert ein Tuple (User, APIKey, is_bot_key)
+    """
+    user = None
+    bot_key = False
+    api_key_obj = None
+
+    # Prüfe API Key Header
+    if api_key:
+        result = await db.execute(select(APIKey).where(APIKey.key == api_key))
+        api_key_obj = result.scalar_one_or_none()
+        if api_key_obj and api_key_obj.is_bot:
+            bot_key = True
+
+    # Prüfe Bearer Token
+    if credentials and not bot_key:
+        token_payload = verify_token(credentials.credentials)
+        if token_payload:
+            result = await db.execute(select(User).where(User.id == int(token_payload.sub)))
+            user = result.scalar_one_or_none()
+
+    return (user, api_key_obj, bot_key)
