@@ -273,21 +273,10 @@ async def login_with_mfa(
 @router.post("/refresh", response_model=Token)
 @limit_auth("10/minute")
 async def refresh_tokens(
+    request: Request,
     refresh_data: RefreshToken,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict:
-    """Refresh access token using refresh token.
-
-    Args:
-        refresh_data: Refresh token
-        db: Database session
-
-    Returns:
-        New access and refresh tokens
-
-    Raises:
-        HTTPException: If refresh token is invalid
-    """
     token_payload = verify_token(refresh_data.refresh_token, token_type="refresh")
 
     if token_payload is None:
@@ -296,7 +285,6 @@ async def refresh_tokens(
             detail="Invalid or expired refresh token",
         )
 
-    # Verify user still exists and is active
     result = await db.execute(select(User).where(User.id == int(token_payload.sub)))
     user = result.scalar_one_or_none()
 
@@ -306,7 +294,6 @@ async def refresh_tokens(
             detail="User not found or inactive",
         )
 
-    # Create new tokens
     access_token = create_access_token(user.id)
     new_refresh_token = create_refresh_token(user.id)
 
