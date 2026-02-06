@@ -85,3 +85,19 @@ async def get_api_key_or_user(
             user = result.scalar_one_or_none()
 
     return (user, api_key_obj, bot_key)
+
+def require_permission(permission: str):
+    """
+    Prüft, ob der aktuelle User die Berechtigung hat oder Superuser ist.
+    Benutzung in Routen: Depends(require_permission("permission_name"))
+    """
+    async def dependency(user: User = Depends(get_current_active_user)):
+        # Beispiel: user.permissions als Liste von Strings
+        user_permissions = getattr(user, "permissions", [])
+        if permission not in user_permissions and not user.is_superuser:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission '{permission}' required"
+            )
+        return user
+    return dependency
