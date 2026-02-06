@@ -1,5 +1,3 @@
-"""API Core Package."""
-
 from .config import settings
 from .database import get_db, engine, AsyncSessionLocal
 from .security import get_current_user, get_current_active_user
