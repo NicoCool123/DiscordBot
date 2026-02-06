@@ -7,6 +7,8 @@ from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi import APIRouter, status as fastapi_status
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import select, or_
@@ -20,12 +22,11 @@ from api.models import AuditLog, User
 from api.models.audit_log import AuditActions
 from api.routes import api_router
 from api.schemas import UserResponse, UserCreate
-from api.websocket import status
-from api.websocket.logs import router as logs_ws_router, router
-from api.websocket.status import router as status_ws_router
-from fastapi.templating import Jinja2Templates
-
 from bot.main import main
+
+# WebSocket-Router
+from api.websocket.logs import router as logs_ws_router
+from api.websocket.status import router as status_ws_router
 
 # ----------------------
 # Base directory & templates
@@ -34,18 +35,14 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "dashboard", "templates"))
 
 # ----------------------
-# Configure logging
+# Logging
 # ----------------------
 logging.basicConfig(
-    level=logging.WARNING,  # Nur Warnungen/Fehler
+    level=logging.WARNING,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
-
-# SQLAlchemy nur Warnungen
 logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
-# Uvicorn access logs reduzieren
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-
 logger = logging.getLogger(__name__)
 
 # ----------------------
@@ -53,7 +50,6 @@ logger = logging.getLogger(__name__)
 # ----------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator:
-    # Keine INFO-Logs mehr beim Start
     try:
         await init_db()
     except Exception as e:
@@ -62,13 +58,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     await close_db()
 
 # ----------------------
-# FastAPI app
+# FastAPI App
 # ----------------------
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="Discord Bot Backend API",
-    docs_url=None,   # keine Swagger UI
+    docs_url=None,
     redoc_url=None,
     openapi_url=None,
     lifespan=lifespan,
@@ -110,7 +106,7 @@ app.include_router(logs_ws_router, prefix="/ws", tags=["WebSocket"])
 app.include_router(status_ws_router, prefix="/ws", tags=["WebSocket"])
 
 # ----------------------
-# Root & health
+# Root & Health
 # ----------------------
 @app.get("/")
 async def root():
@@ -121,7 +117,7 @@ async def health() -> dict:
     return {"status": "healthy"}
 
 # ----------------------
-# Dashboard page routes
+# Dashboard Page Routes
 # ----------------------
 @app.get("/dashboard")
 async def dashboard_page(request: Request):
@@ -151,29 +147,20 @@ async def metrics_page(request: Request):
 async def logout_page():
     return RedirectResponse(url="/login")
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-@limit_auth("3/minute")  # optional, für Rate-Limiting
+# ----------------------
+# Register Route
+# ----------------------
+router = APIRouter()
+
+@router.post("/register", response_model=UserResponse, status_code=fastapi_status.HTTP_201_CREATED)
+@limit_auth("3/minute")
 async def register(
     request: Request,
     user_data: UserCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> User:
-    """
-    Register a new user.
 
-    Args:
-        request: FastAPI request object
-        user_data: UserCreate schema (username, email, password)
-        db: Database session
-
-    Returns:
-        Created User object
-
-    Raises:
-        HTTPException: If username/email already exists
-    """
-
-    # --- Schritt 1: Benutzer prüfen ---
+    # --- Check if user exists ---
     result = await db.execute(
         select(User).where(
             or_(
@@ -187,16 +174,15 @@ async def register(
     if existing_user:
         if existing_user.username == user_data.username.lower():
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=fastapi_status.HTTP_400_BAD_REQUEST,
                 detail="Username already registered",
             )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered",
-            )
+        raise HTTPException(
+            status_code=fastapi_status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered",
+        )
 
-    # --- Schritt 2: Benutzer anlegen ---
+    # --- Create user ---
     user = User(
         username=user_data.username.lower(),
         email=user_data.email.lower(),
@@ -209,7 +195,7 @@ async def register(
     await db.commit()
     await db.refresh(user)
 
-    # --- Schritt 3: Audit-Log ---
+    # --- Audit Log ---
     audit = AuditLog.create(
         action=AuditActions.USER_CREATE,
         resource="user",
@@ -220,8 +206,13 @@ async def register(
     db.add(audit)
     await db.commit()
 
-    # --- Schritt 4: Rückgabe ---
     return user
 
+# Include router
+app.include_router(router, prefix="/api/v1/auth")
+
+# ----------------------
+# Start Bot (wenn main)
+# ----------------------
 if __name__ == "__main__":
     main()
