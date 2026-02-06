@@ -1,7 +1,3 @@
-/**
- * WebSocket utilities for real-time updates
- */
-
 class WebSocketManager {
     constructor() {
         this.connections = new Map();
@@ -10,15 +6,22 @@ class WebSocketManager {
         this.reconnectDelay = 3000;
     }
 
-    /**
-     * Connect to a WebSocket endpoint
-     */
-    connect(channel, options = {}) {
+    // --- connect-Methode mit Auth ---
+    async connect(channel, options = {}) {
         if (this.connections.has(channel)) {
             return this.connections.get(channel);
         }
 
-        const token = localStorage.getItem('access_token');
+        // Sicherstellen, dass Token gültig ist
+        if (!Auth.isAuthenticated()) {
+            const refreshed = await Auth.refreshToken();
+            if (!refreshed) {
+                console.error('Cannot connect WS: authentication failed');
+                return;
+            }
+        }
+
+        const token = Auth.getToken();
         const baseUrl = `ws://${window.location.host}/ws`;
         const url = `${baseUrl}/${channel}?token=${token}`;
 
@@ -42,10 +45,8 @@ class WebSocketManager {
         ws.onclose = (event) => {
             console.log(`WebSocket closed: ${channel}`, event.code);
             this.connections.delete(channel);
-
             if (options.onClose) options.onClose(event);
 
-            // Attempt reconnect if not intentional close
             if (event.code !== 1000 && event.code !== 4001) {
                 this.attemptReconnect(channel, options);
             }
@@ -60,9 +61,6 @@ class WebSocketManager {
         return ws;
     }
 
-    /**
-     * Attempt to reconnect to a WebSocket
-     */
     attemptReconnect(channel, options) {
         const attempts = this.reconnectAttempts.get(channel) || 0;
 
@@ -80,9 +78,6 @@ class WebSocketManager {
         }, delay);
     }
 
-    /**
-     * Send a message through a WebSocket
-     */
     send(channel, message) {
         const ws = this.connections.get(channel);
         if (ws && ws.readyState === WebSocket.OPEN) {
@@ -92,9 +87,6 @@ class WebSocketManager {
         return false;
     }
 
-    /**
-     * Close a WebSocket connection
-     */
     close(channel) {
         const ws = this.connections.get(channel);
         if (ws) {
@@ -103,28 +95,22 @@ class WebSocketManager {
         }
     }
 
-    /**
-     * Close all WebSocket connections
-     */
     closeAll() {
         for (const [channel] of this.connections) {
             this.close(channel);
         }
     }
 
-    /**
-     * Check if connected to a channel
-     */
     isConnected(channel) {
         const ws = this.connections.get(channel);
         return ws && ws.readyState === WebSocket.OPEN;
     }
 }
 
-// Global WebSocket manager instance
+// Einmalige globale Instanz
 window.wsManager = new WebSocketManager();
 
-// Close connections when leaving page
+// Close all WS connections when leaving page
 window.addEventListener('beforeunload', () => {
     window.wsManager.closeAll();
 });
