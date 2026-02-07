@@ -784,5 +784,5 @@ async def discord_oauth_callback(
     await db.commit()
 
     # Redirect to dashboard with tokens in query params (frontend stores them)
-    redirect_url = f"/dashboard?access_token={access_token}&refresh_token={refresh_token}"
+    redirect_url = f"{settings.dashboard_url}/dashboard?access_token={access_token}&refresh_token={refresh_token}"
     return RedirectResponse(url=redirect_url, status_code=302)
