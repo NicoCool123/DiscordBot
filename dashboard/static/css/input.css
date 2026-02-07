@@ -3,12 +3,16 @@
 @tailwind utilities;
 
 @layer base {
+  [x-cloak] {
+    display: none !important;
+  }
+
   html {
     font-family: 'Inter', system-ui, sans-serif;
   }
 
   body {
-    @apply bg-gray-100 dark:bg-discord-darkest text-gray-900 dark:text-gray-100;
+    @apply bg-gray-50 dark:bg-discord-darkest text-gray-900 dark:text-gray-100;
   }
 }
 
@@ -18,7 +22,7 @@
   }
 
   .btn-primary {
-    @apply btn bg-discord-blurple text-white hover:bg-opacity-90 focus:ring-discord-blurple;
+    @apply btn bg-discord-blurple text-white hover:bg-[#4752C4] focus:ring-discord-blurple dark:focus:ring-offset-discord-darkest;
   }
 
   .btn-secondary {
@@ -34,7 +38,7 @@
   }
 
   .card {
-    @apply bg-white dark:bg-discord-darker rounded-xl shadow-lg p-6;
+    @apply bg-white dark:bg-discord-darker rounded-xl shadow-sm border border-gray-200 dark:border-gray-700/50 p-6;
   }
 
   .input {
@@ -110,7 +114,21 @@
   }
 }
 
+@layer components {
+  .toggle {
+    @apply relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer;
+  }
+
+  .toggle-dot {
+    @apply inline-block h-4 w-4 rounded-full bg-white transition-transform shadow-sm;
+  }
+}
+
 @layer utilities {
+  .skeleton {
+    @apply animate-pulse bg-gray-200 dark:bg-discord-dark rounded;
+  }
+
   .scrollbar-thin {
     scrollbar-width: thin;
   }

@@ -2,11 +2,16 @@
 
 import base64
 import io
+import secrets
+import time
 from datetime import datetime
 from typing import Annotated
+from urllib.parse import urlencode
 
+import httpx
 import pyotp
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +25,7 @@ from api.core.security import (
     verify_password,
 )
 from api.models.audit_log import AuditActions, AuditLog
+from api.models.role import Role
 from api.models.user import User
 from api.schemas.auth import (
     MFALogin,
@@ -89,6 +95,16 @@ async def register(
     )
 
     db.add(user)
+    await db.flush()
+
+    # Auto-assign "viewer" role
+    from api.models.role import UserRole
+    viewer_result = await db.execute(select(Role).where(Role.name == "viewer"))
+    viewer = viewer_result.scalar_one_or_none()
+    if viewer:
+        user_role = UserRole(user_id=user.id, role_id=viewer.id)
+        db.add(user_role)
+
     await db.commit()
     await db.refresh(user)
 
@@ -142,7 +158,7 @@ async def login(
         )
 
     # --- Schritt 2: Passwort prüfen ---
-    if not verify_password(credentials.password, user.password_hash):
+    if not user.password_hash or not verify_password(credentials.password, user.password_hash):
         audit = AuditLog.create(
             action=AuditActions.LOGIN_FAILED,
             resource="auth",
@@ -230,7 +246,7 @@ async def login_with_mfa(
     )
     user = result.scalar_one_or_none()
 
-    if user is None or not verify_password(credentials.password, user.password_hash):
+    if user is None or not user.password_hash or not verify_password(credentials.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
@@ -590,3 +606,183 @@ async def disable_mfa(
     await db.commit()
 
     return {"message": "MFA disabled successfully"}
+
+
+# ----------------------
+# Discord OAuth
+# ----------------------
+
+DISCORD_API_BASE = "https://discord.com/api/v10"
+DISCORD_OAUTH_AUTHORIZE = "https://discord.com/api/oauth2/authorize"
+DISCORD_OAUTH_TOKEN = "https://discord.com/api/oauth2/token"
+
+
+def _create_oauth_state() -> str:
+    """Create an HMAC-signed state token (works across workers)."""
+    import hashlib
+    import hmac
+    ts = str(int(time.time()))
+    nonce = secrets.token_urlsafe(16)
+    payload = f"{ts}:{nonce}"
+    sig = hmac.new(settings.secret_key.encode(), payload.encode(), hashlib.sha256).hexdigest()[:16]
+    return f"{payload}:{sig}"
+
+
+def _verify_oauth_state(state: str) -> bool:
+    """Verify an HMAC-signed state token (valid for 10 minutes)."""
+    import hashlib
+    import hmac
+    try:
+        parts = state.rsplit(":", 2)
+        if len(parts) != 3:
+            return False
+        ts, nonce, sig = parts[0], parts[1], parts[2]
+        payload = f"{ts}:{nonce}"
+        expected = hmac.new(settings.secret_key.encode(), payload.encode(), hashlib.sha256).hexdigest()[:16]
+        if not hmac.compare_digest(sig, expected):
+            return False
+        # Check expiry (10 minutes)
+        return (time.time() - int(ts)) < 600
+    except (ValueError, IndexError):
+        return False
+
+
+@router.get("/discord")
+async def discord_oauth_redirect():
+    """Redirect user to Discord OAuth authorization page."""
+    if not settings.discord_client_id:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Discord OAuth is not configured",
+        )
+
+    state = _create_oauth_state()
+
+    params = {
+        "client_id": settings.discord_client_id,
+        "redirect_uri": settings.discord_oauth_redirect_uri,
+        "response_type": "code",
+        "scope": "identify email guilds",
+        "state": state,
+    }
+    url = f"{DISCORD_OAUTH_AUTHORIZE}?{urlencode(params)}"
+    return RedirectResponse(url=url)
+
+
+@router.get("/discord/callback")
+async def discord_oauth_callback(
+    request: Request,
+    code: str,
+    state: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Handle Discord OAuth callback."""
+    # Validate state
+    if not _verify_oauth_state(state):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired OAuth state",
+        )
+
+    # Exchange code for token
+    async with httpx.AsyncClient() as client:
+        token_response = await client.post(
+            DISCORD_OAUTH_TOKEN,
+            data={
+                "client_id": settings.discord_client_id,
+                "client_secret": settings.discord_client_secret,
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": settings.discord_oauth_redirect_uri,
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+
+        if token_response.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to exchange code for token",
+            )
+
+        token_data = token_response.json()
+        discord_access_token = token_data["access_token"]
+
+        # Fetch user info from Discord
+        user_response = await client.get(
+            f"{DISCORD_API_BASE}/users/@me",
+            headers={"Authorization": f"Bearer {discord_access_token}"},
+        )
+
+        if user_response.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to fetch Discord user info",
+            )
+
+        discord_user = user_response.json()
+
+    discord_id = discord_user["id"]
+    discord_username = discord_user["username"]
+    discord_email = discord_user.get("email")
+    discord_avatar = discord_user.get("avatar")
+
+    # Check if user with this discord_id exists
+    result = await db.execute(select(User).where(User.discord_id == discord_id))
+    user = result.scalar_one_or_none()
+
+    if user is None and discord_email:
+        # Check if user with this email exists (link accounts)
+        result = await db.execute(select(User).where(User.email == discord_email.lower()))
+        user = result.scalar_one_or_none()
+
+    if user:
+        # Existing user — update Discord fields and login
+        user.discord_id = discord_id
+        user.discord_access_token = discord_access_token
+        if discord_avatar:
+            user.discord_avatar = discord_avatar
+        user.last_login = datetime.utcnow()
+    else:
+        # New user — create account
+        user = User(
+            username=f"{discord_username}_{discord_id[:4]}",
+            email=discord_email.lower() if discord_email else f"{discord_id}@discord.user",
+            password_hash=None,
+            is_active=True,
+            is_superuser=False,
+            discord_id=discord_id,
+            discord_access_token=discord_access_token,
+            discord_avatar=discord_avatar,
+        )
+        db.add(user)
+        await db.flush()
+
+        # Auto-assign viewer role
+        from api.models.role import UserRole
+        viewer_result = await db.execute(select(Role).where(Role.name == "viewer"))
+        viewer = viewer_result.scalar_one_or_none()
+        if viewer:
+            user_role = UserRole(user_id=user.id, role_id=viewer.id)
+            db.add(user_role)
+
+    await db.commit()
+    await db.refresh(user)
+
+    # Create JWT tokens
+    access_token = create_access_token(user.id)
+    refresh_token = create_refresh_token(user.id)
+
+    # Audit log
+    audit = AuditLog.create(
+        action=AuditActions.LOGIN,
+        resource="auth",
+        user_id=user.id,
+        details={"method": "discord_oauth"},
+        ip_address=request.client.host if request.client else None,
+    )
+    db.add(audit)
+    await db.commit()
+
+    # Redirect to dashboard with tokens in query params (frontend stores them)
+    redirect_url = f"/dashboard?access_token={access_token}&refresh_token={refresh_token}"
+    return RedirectResponse(url=redirect_url, status_code=302)

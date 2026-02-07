@@ -21,8 +21,9 @@ class WebSocketManager {
             }
         }
 
-        const token = Auth.getToken();
-        const baseUrl = `ws://${window.location.host}/ws`;
+        const token = localStorage.getItem("access_token");
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const baseUrl = `${protocol}//${window.location.host}/ws`;
         const url = `${baseUrl}/${channel}?token=${token}`;
 
         const ws = new WebSocket(url);

@@ -20,6 +20,14 @@ class Moderation(commands.Cog):
         """Initialize the Moderation cog."""
         self.bot = bot
 
+    async def cog_before_invoke(self, ctx) -> None:
+        """Check if the command is enabled for this guild."""
+        if ctx.guild and self.bot.api:
+            cmd_name = ctx.command.qualified_name if hasattr(ctx.command, 'qualified_name') else str(ctx.command)
+            config = await self.bot.api.get_command_config(str(ctx.guild.id), cmd_name)
+            if not config.get("enabled", True):
+                raise commands.CheckFailure(f"Command `{cmd_name}` is disabled in this server.")
+
     # -------------------------------------------------------------------------
     # Slash Command Group
     # -------------------------------------------------------------------------

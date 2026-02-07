@@ -5,45 +5,73 @@
 
 {% block content %}
 <div class="space-y-6" x-data="modulesPage()">
-    <!-- Module Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <template x-for="module in modules" :key="module.name">
-            <div class="card">
-                <div class="flex items-start justify-between mb-4">
-                    <div>
-                        <h3 class="font-semibold" x-text="module.display_name"></h3>
-                        <span class="badge" :class="module.is_enabled ? 'badge-success' : 'badge-danger'" x-text="module.is_enabled ? 'Enabled' : 'Disabled'"></span>
-                    </div>
-                    <span class="badge badge-info" x-text="module.category"></span>
-                </div>
-
-                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4" x-text="module.description || 'No description'"></p>
-
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <span x-show="module.is_core" class="text-xs text-gray-500">Core Module</span>
-                    </div>
-                    <button
-                        @click="toggleModule(module)"
-                        :disabled="module.is_core || loading === module.name"
-                        class="btn text-sm"
-                        :class="module.is_enabled ? 'btn-danger' : 'btn-success'"
-                    >
-                        <span x-show="loading !== module.name" x-text="module.is_enabled ? 'Disable' : 'Enable'"></span>
-                        <span x-show="loading === module.name">...</span>
-                    </button>
-                </div>
+    <!-- Guild Selector -->
+    <div class="card">
+        <div class="flex flex-wrap items-center gap-4">
+            <label class="label mb-0 flex-shrink-0">Select Server:</label>
+            <div x-show="loadingGuilds" class="text-sm text-gray-400">Loading servers...</div>
+            <div x-show="!loadingGuilds && guilds.length === 0" x-cloak class="text-sm text-gray-400">
+                No servers found. <a href="/api/v1/auth/discord" class="text-discord-blurple hover:underline">Login with Discord</a> first.
             </div>
-        </template>
+            <select x-show="!loadingGuilds && guilds.length > 0" x-cloak x-model="selectedGuild" @change="fetchModules()" class="input max-w-xs">
+                <option value="">-- Select a server --</option>
+                <template x-for="guild in guilds" :key="guild.id">
+                    <option :value="guild.id" x-text="guild.name"></option>
+                </template>
+            </select>
+        </div>
     </div>
 
-    <!-- Empty State -->
-    <div x-show="modules.length === 0" class="card text-center py-12">
-        <svg class="w-12 h-12 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"/>
+    <!-- Module Grid -->
+    <div x-show="selectedGuild" x-cloak>
+        <div x-show="loadingModules" class="text-center py-8 text-gray-400 text-sm">Loading modules...</div>
+
+        <div x-show="!loadingModules && modules.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <template x-for="module in modules" :key="module.name">
+                <div class="card hover:border-gray-300 dark:hover:border-gray-600 transition-colors">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <h3 class="font-semibold text-sm" x-text="module.display_name"></h3>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1"
+                                :class="module.is_enabled ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'"
+                                x-text="module.is_enabled ? 'Enabled' : 'Disabled'"></span>
+                        </div>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" x-text="module.category"></span>
+                    </div>
+
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-4" x-text="module.description || 'No description'"></p>
+
+                    <div class="flex items-center justify-between">
+                        <span x-show="module.is_core" class="text-xs text-gray-400">Core Module</span>
+                        <span x-show="!module.is_core"></span>
+                        <button
+                            @click="toggleModule(module)"
+                            :disabled="module.is_core || loading === module.name"
+                            class="toggle"
+                            :class="module.is_enabled ? 'bg-discord-green' : 'bg-gray-300 dark:bg-gray-600'"
+                        >
+                            <span class="toggle-dot" :class="module.is_enabled ? 'translate-x-6' : 'translate-x-1'"></span>
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- Empty State -->
+        <div x-show="!loadingModules && modules.length === 0" class="card text-center py-10">
+            <svg class="w-10 h-10 mx-auto text-gray-300 dark:text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"/>
+            </svg>
+            <p class="text-sm text-gray-400">No modules found for this server.</p>
+        </div>
+    </div>
+
+    <!-- No guild selected -->
+    <div x-show="!selectedGuild && !loadingGuilds" x-cloak class="card text-center py-10">
+        <svg class="w-10 h-10 mx-auto text-gray-300 dark:text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/>
         </svg>
-        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">No modules found</h3>
-        <p class="text-gray-500">Modules will appear here once configured.</p>
+        <p class="text-sm text-gray-400">Select a server above to manage modules.</p>
     </div>
 </div>
 {% endblock %}
@@ -52,50 +80,67 @@
 <script>
 function modulesPage() {
     return {
+        guilds: [],
+        selectedGuild: '',
         modules: [],
         loading: null,
+        loadingGuilds: true,
+        loadingModules: false,
 
         async init() {
-            await this.fetchModules();
+            await this.fetchGuilds();
+        },
+
+        async fetchGuilds() {
+            this.loadingGuilds = true;
+            try {
+                const res = await Auth.fetch('/api/v1/guilds/');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.guilds = data.guilds;
+                }
+            } catch (e) {
+                console.error('Failed to load guilds:', e);
+            } finally {
+                this.loadingGuilds = false;
+            }
         },
 
         async fetchModules() {
+            if (!this.selectedGuild) { this.modules = []; return; }
+            this.loadingModules = true;
             try {
-                const response = await fetch('/api/v1/bot/modules', {
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
-                });
-
+                const response = await Auth.fetch('/api/v1/bot/modules');
                 if (response.ok) {
                     const data = await response.json();
                     this.modules = data.modules;
                 }
             } catch (error) {
                 console.error('Failed to fetch modules:', error);
+            } finally {
+                this.loadingModules = false;
             }
         },
 
         async toggleModule(module) {
             this.loading = module.name;
-
             try {
                 const endpoint = module.is_enabled ? '/api/v1/bot/module/disable' : '/api/v1/bot/module/enable';
-                const response = await fetch(endpoint, {
+                const response = await Auth.fetch(endpoint, {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ module_name: module.name })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ module_name: module.name, guild_id: this.selectedGuild })
                 });
 
                 if (response.ok) {
                     module.is_enabled = !module.is_enabled;
+                    showToast(`${module.display_name} ${module.is_enabled ? 'enabled' : 'disabled'}`, 'success');
                 } else {
                     const error = await response.json();
-                    alert(error.detail || 'Failed to toggle module');
+                    showToast(error.detail || 'Failed to toggle module', 'error');
                 }
             } catch (error) {
-                alert('Failed to toggle module');
+                showToast('Failed to toggle module', 'error');
             } finally {
                 this.loading = null;
             }

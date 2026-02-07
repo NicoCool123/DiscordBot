@@ -1,28 +1,20 @@
 import os
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Annotated
+from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi import APIRouter, status as fastapi_status
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from sqlalchemy import select, or_
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.config import settings
-from api.core.database import close_db, init_db, get_db
-from api.core.rate_limiter import limiter, limit_auth
-from api.core.security import get_password_hash
-from api.models import AuditLog, User
-from api.models.audit_log import AuditActions
+from api.core.database import close_db, init_db
+from api.core.rate_limiter import limiter
 from api.routes import api_router
-from api.schemas import UserResponse, UserCreate
-from bot.main import main
 
 # WebSocket-Router
 from api.websocket.logs import router as logs_ws_router
@@ -143,76 +135,21 @@ async def logs_page(request: Request):
 async def metrics_page(request: Request):
     return templates.TemplateResponse("metrics.html", {"request": request, "active_page": "metrics"})
 
+@app.get("/commands")
+async def commands_page(request: Request):
+    return templates.TemplateResponse("commands.html", {"request": request, "active_page": "commands"})
+
 @app.get("/logout")
 async def logout_page():
     return RedirectResponse(url="/login")
 
-# ----------------------
-# Register Route
-# ----------------------
-router = APIRouter()
-
-@router.post("/register", response_model=UserResponse, status_code=fastapi_status.HTTP_201_CREATED)
-@limit_auth("3/minute")
-async def register(
-    request: Request,
-    user_data: UserCreate,
-    db: Annotated[AsyncSession, Depends(get_db)],
-) -> User:
-
-    # --- Check if user exists ---
-    result = await db.execute(
-        select(User).where(
-            or_(
-                User.username == user_data.username.lower(),
-                User.email == user_data.email.lower(),
-            )
-        )
-    )
-    existing_user = result.scalar_one_or_none()
-
-    if existing_user:
-        if existing_user.username == user_data.username.lower():
-            raise HTTPException(
-                status_code=fastapi_status.HTTP_400_BAD_REQUEST,
-                detail="Username already registered",
-            )
-        raise HTTPException(
-            status_code=fastapi_status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered",
-        )
-
-    # --- Create user ---
-    user = User(
-        username=user_data.username.lower(),
-        email=user_data.email.lower(),
-        password_hash=get_password_hash(user_data.password),
-        is_active=True,
-        is_superuser=False,
-    )
-
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-
-    # --- Audit Log ---
-    audit = AuditLog.create(
-        action=AuditActions.USER_CREATE,
-        resource="user",
-        user_id=user.id,
-        resource_id=str(user.id),
-        ip_address=request.client.host if request.client else None,
-    )
-    db.add(audit)
-    await db.commit()
-
-    return user
-
-# Include router
-app.include_router(router, prefix="/api/v1/auth")
+@app.get("/register")
+async def register_page(request: Request):
+    return templates.TemplateResponse("register.html", {"request": request})
 
 # ----------------------
 # Start Bot (wenn main)
 # ----------------------
 if __name__ == "__main__":
+    from bot.main import main
     main()

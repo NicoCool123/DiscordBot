@@ -3,15 +3,32 @@
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 
 from api.core.config import settings
 from api.core.jwt_handler import verify_token
+from api.models import User
 from api.websocket.manager import manager
 
 router = APIRouter()
 
 
+async def get_ws_user(websocket: WebSocket):
+    token = websocket.query_params.get("token")
+    api_key = websocket.query_params.get("api_key")
+
+    # Bearer Token prüfen
+    if token:
+        payload = verify_token(token)
+        if payload:
+            return payload
+
+    # API Key prüfen (z. B. vom Bot)
+    if api_key == settings.bot_api_key:
+        return {"bot": True}
+
+    # Nicht authentifiziert
+    return None
 async def authenticate_websocket(websocket: WebSocket) -> bool:
     """Authenticate a WebSocket connection.
 
@@ -37,21 +54,16 @@ async def authenticate_websocket(websocket: WebSocket) -> bool:
 
 
 @router.websocket("/status")
-async def status_websocket(websocket: WebSocket) -> None:
-    """WebSocket endpoint for live status updates.
-
-    Args:
-        websocket: WebSocket connection
-    """
-    # Authenticate
-    if not await authenticate_websocket(websocket):
+async def status_websocket(
+    websocket: WebSocket,
+    user = Depends(get_ws_user),
+):
+    if user is None:
         await websocket.close(code=4001, reason="Unauthorized")
         return
 
-    # Connect to status channel
     await manager.connect(websocket, channel="status")
 
-    # Send initial message
     await manager.send_personal(
         websocket,
         {
@@ -63,7 +75,6 @@ async def status_websocket(websocket: WebSocket) -> None:
 
     try:
         while True:
-            # Wait for messages from client
             data = await websocket.receive_json()
 
             if data.get("type") == "ping":
@@ -73,12 +84,9 @@ async def status_websocket(websocket: WebSocket) -> None:
                 )
 
             elif data.get("type") == "status_update":
-                # Bot is sending status update
                 await broadcast_status(data.get("data", {}))
 
     except WebSocketDisconnect:
-        pass
-    except Exception:
         pass
     finally:
         await manager.disconnect(websocket, channel="status")

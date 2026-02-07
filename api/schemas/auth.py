@@ -59,6 +59,20 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
+    @field_validator("roles", mode="before")
+    @classmethod
+    def serialize_roles(cls, v):
+        if v and hasattr(v[0], "name"):
+            return [r.name for r in v]
+        return v
+
+    @field_validator("permissions", mode="before")
+    @classmethod
+    def serialize_permissions(cls, v):
+        if isinstance(v, set):
+            return list(v)
+        return v
+
 
 class UserUpdate(BaseModel):
     """Schema for updating user profile."""

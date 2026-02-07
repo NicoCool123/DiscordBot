@@ -136,6 +136,10 @@ class Application:
         async def metrics(request: Request):
             return self.templates.TemplateResponse("metrics.html", {"request": request, "active_page": "metrics"})
 
+        @self.app.get("/commands")
+        async def commands(request: Request):
+            return self.templates.TemplateResponse("commands.html", {"request": request, "active_page": "commands"})
+
         @self.app.get("/logout")
         async def logout():
             return RedirectResponse(url="/login")

@@ -89,7 +89,7 @@ class DiscordBot(commands.Bot):
         cogs_dir = Path(__file__).parent / "cogs"
 
         # Core cogs to load
-        core_cogs = ["admin", "moderation"]
+        core_cogs = ["admin", "moderation", "custom_commands"]
 
         # Optional cogs based on settings
         if settings.rcon_enabled:

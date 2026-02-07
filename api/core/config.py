@@ -55,6 +55,13 @@ class Settings(BaseSettings):
     # Dashboard
     dashboard_url: str = Field(default="http://localhost:3000")
 
+    # Discord OAuth
+    discord_client_id: str = Field(default="")
+    discord_client_secret: str = Field(default="")
+    discord_oauth_redirect_uri: str = Field(
+        default="http://localhost:8000/api/v1/auth/discord/callback"
+    )
+
     # Minecraft RCON
     rcon_enabled: bool = Field(default=False)
     rcon_host: str = Field(default="localhost")

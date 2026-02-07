@@ -68,9 +68,25 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Initialize database by creating all tables."""
+    """Initialize database by creating all tables and seed default roles."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # Seed default roles if they don't exist
+    from api.models.role import Role, DEFAULT_ROLES
+    from sqlalchemy import select
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Role).limit(1))
+        if result.scalar_one_or_none() is None:
+            for role_data in DEFAULT_ROLES:
+                role = Role(
+                    name=role_data["name"],
+                    description=role_data["description"],
+                    permissions=role_data["permissions"],
+                )
+                session.add(role)
+            await session.commit()
 
 
 async def close_db() -> None:

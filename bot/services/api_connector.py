@@ -224,6 +224,26 @@ class APIConnector:
         return await self.post("/minecraft/command", data={"command": command})
 
     # ======================================================================
+    # CUSTOM COMMANDS API
+    # ======================================================================
+
+    async def get_custom_commands(self, guild_id: str) -> dict[str, Any]:
+        return await self.get(f"/commands/{guild_id}")
+
+    async def get_command_config(
+        self, guild_id: str, command_name: str
+    ) -> dict[str, Any]:
+        """Get the config for a built-in command (enabled/disabled)."""
+        try:
+            result = await self.get(f"/commands/{guild_id}/builtin")
+            for cmd in result.get("commands", []):
+                if cmd["name"] == command_name:
+                    return cmd
+            return {"name": command_name, "enabled": True}
+        except APIError:
+            return {"name": command_name, "enabled": True}
+
+    # ======================================================================
     # AUDIT LOG API
     # ======================================================================
 
