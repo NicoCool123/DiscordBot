@@ -2,8 +2,6 @@
 
 from functools import lru_cache
 from typing import Optional
-import os
-from dotenv import load_dotenv
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -62,8 +60,5 @@ def get_settings() -> BotSettings:
     """Get cached settings instance."""
     return BotSettings()
 
-
-load_dotenv()  # Load .env
-print("DISCORD_TOKEN:", os.getenv("DISCORD_TOKEN"))
 
 settings = get_settings()

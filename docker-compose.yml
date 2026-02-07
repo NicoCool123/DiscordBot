@@ -54,7 +54,7 @@ services:
     container_name: discord_bot_api
     restart: unless-stopped
     env_file:
-      - .env.local
+      - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-discord_bot}
       REDIS_URL: redis://redis:6379/0
@@ -84,7 +84,7 @@ services:
     container_name: discord_bot
     restart: unless-stopped
     env_file:
-      - .env.local
+      - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-discord_bot}
       API_URL: http://api:8000
