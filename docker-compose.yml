@@ -1,5 +1,16 @@
 version: "3.8"
 
+# =============================================================================
+# LOCAL DEVELOPMENT
+# =============================================================================
+# Start:   docker compose up
+# Stop:    docker compose down
+# Rebuild: docker compose up --build
+#
+# Dashboard: http://localhost:8000
+# API docs:  http://localhost:8000/docs
+# =============================================================================
+
 services:
   # PostgreSQL Database
   postgres:
@@ -10,6 +21,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
       POSTGRES_DB: ${POSTGRES_DB:-discord_bot}
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -41,10 +54,12 @@ services:
     container_name: discord_bot_api
     restart: unless-stopped
     env_file:
-      - .env
+      - .env.local
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-discord_bot}
       REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: development
+      DEBUG: "true"
     ports:
       - "8000:8000"
     depends_on:
@@ -53,8 +68,8 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - ./api:/app/api:ro
-      - ./dashboard:/app/dashboard:ro
+      - ./api:/app/api
+      - ./dashboard:/app/dashboard
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -69,7 +84,7 @@ services:
     container_name: discord_bot
     restart: unless-stopped
     env_file:
-      - .env
+      - .env.local
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-discord_bot}
       API_URL: http://api:8000
@@ -77,7 +92,7 @@ services:
       api:
         condition: service_healthy
     volumes:
-      - ./bot:/app/bot:ro
+      - ./bot:/app/bot
 
 volumes:
   postgres_data:

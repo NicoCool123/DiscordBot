@@ -1,5 +1,17 @@
 version: "3.8"
 
+# =============================================================================
+# PRODUCTION SERVER
+# =============================================================================
+# Start:   docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+# Stop:    docker compose -f docker-compose.prod.yml down
+# Logs:    docker compose -f docker-compose.prod.yml logs -f
+# Rebuild: docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+#
+# Dashboard: https://dashboard.redcrafteryt11.net
+# API:       https://api.redcrafteryt11.net
+# =============================================================================
+
 services:
   # PostgreSQL Database
   postgres:
@@ -44,7 +56,7 @@ services:
     container_name: discord_bot_api
     restart: always
     env_file:
-      - .env
+      - .env.production
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
@@ -72,7 +84,7 @@ services:
     container_name: discord_bot
     restart: always
     env_file:
-      - .env
+      - .env.production
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       API_URL: http://api:8000
