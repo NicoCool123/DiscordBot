@@ -4,8 +4,9 @@
 
 // Initialize bot status checker
 document.addEventListener('DOMContentLoaded', () => {
-    // Skip on login page
-    if (window.location.pathname.startsWith('/login')) {
+    // Skip on login/register pages
+    if (window.location.pathname.startsWith('/login') ||
+        window.location.pathname.startsWith('/register')) {
         return;
     }
 
@@ -50,7 +51,7 @@ function updateStatusDisplay(online, latencyMs = null) {
 
     if (online) {
         indicator.className = 'w-2 h-2 rounded-full bg-discord-green';
-        statusText.textContent = latencyMs ? `Online (${latencyMs.toFixed(0)}ms)` : 'Online';
+        statusText.textContent = latencyMs != null ? `Online (${Number(latencyMs).toFixed(0)}ms)` : 'Online';
     } else {
         indicator.className = 'w-2 h-2 rounded-full bg-discord-red';
         statusText.textContent = 'Offline';
@@ -115,8 +116,16 @@ function formatDuration(seconds) {
  * Show a toast notification
  */
 function showToast(message, type = 'info') {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'fixed bottom-4 right-4 z-50 flex flex-col-reverse gap-2';
+        document.body.appendChild(container);
+    }
+
     const toast = document.createElement('div');
-    toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 transform transition-all duration-300 translate-y-full opacity-0`;
+    toast.className = 'px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 translate-y-full opacity-0';
 
     const colors = {
         success: 'bg-discord-green text-white',
@@ -128,7 +137,7 @@ function showToast(message, type = 'info') {
     toast.className += ` ${colors[type] || colors.info}`;
     toast.textContent = message;
 
-    document.body.appendChild(toast);
+    container.appendChild(toast);
 
     // Animate in
     requestAnimationFrame(() => {

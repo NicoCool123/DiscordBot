@@ -115,7 +115,15 @@
 
     <!-- Quick Actions -->
     <div class="card">
-        <h3 class="text-base font-semibold mb-4">Quick Actions</h3>
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-base font-semibold">Quick Actions</h3>
+            <button onclick="fetchDashboardData()" class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex items-center gap-1 transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                Refresh
+            </button>
+        </div>
         <div class="flex flex-wrap gap-3">
             <button onclick="reloadBot()" class="btn-primary text-sm">
                 <svg class="w-4 h-4 mr-1.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -148,17 +156,32 @@
         return '#3ba55c';
     }
 
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
     async function fetchDashboardData() {
         try {
             const statusResponse = await Auth.fetch('/api/v1/bot/status');
             if (statusResponse.ok) {
                 const status = await statusResponse.json();
-                document.getElementById('stat-guilds').textContent = status.guild_count.toLocaleString();
-                document.getElementById('stat-users').textContent = status.user_count.toLocaleString();
-                document.getElementById('stat-latency').textContent = `${status.latency_ms.toFixed(0)}ms`;
-                document.getElementById('stat-uptime').textContent = formatUptime(status.uptime_seconds);
+                document.getElementById('stat-guilds').textContent = (status.guild_count ?? 0).toLocaleString();
+                document.getElementById('stat-users').textContent = (status.user_count ?? 0).toLocaleString();
+                document.getElementById('stat-latency').textContent = status.latency_ms != null ? `${Number(status.latency_ms).toFixed(0)}ms` : '-';
+                document.getElementById('stat-uptime').textContent = status.uptime_seconds != null ? formatUptime(status.uptime_seconds) : '-';
+            } else {
+                document.getElementById('stat-guilds').textContent = '-';
+                document.getElementById('stat-users').textContent = '-';
+                document.getElementById('stat-latency').textContent = '-';
+                document.getElementById('stat-uptime').textContent = '-';
             }
+        } catch (error) {
+            showToast('Failed to load bot status', 'error');
+        }
 
+        try {
             const metricsResponse = await Auth.fetch('/api/v1/dashboard/metrics');
             if (metricsResponse.ok) {
                 const metrics = await metricsResponse.json();
@@ -181,20 +204,24 @@
                 diskBar.style.width = `${disk}%`;
                 diskBar.style.backgroundColor = getBarColor(disk);
             }
+        } catch (error) {
+            showToast('Failed to load system metrics', 'error');
+        }
 
+        try {
             const activityResponse = await Auth.fetch('/api/v1/dashboard/activity?limit=5');
             if (activityResponse.ok) {
                 const activity = await activityResponse.json();
                 const activityList = document.getElementById('activity-list');
 
-                if (activity.activity.length === 0) {
+                if (!activity.activity || activity.activity.length === 0) {
                     activityList.innerHTML = '<div class="text-center text-gray-400 py-6 text-sm">No recent activity</div>';
                 } else {
                     activityList.innerHTML = activity.activity.map(item => `
                         <div class="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-discord-dark transition-colors">
                             <div class="w-1.5 h-1.5 rounded-full bg-discord-blurple flex-shrink-0"></div>
                             <div class="flex-1 min-w-0">
-                                <p class="text-sm truncate">${item.description}</p>
+                                <p class="text-sm truncate">${escapeHtml(item.description || '')}</p>
                                 <p class="text-xs text-gray-400 mt-0.5">${formatTimestamp(item.timestamp)}</p>
                             </div>
                         </div>
@@ -202,7 +229,7 @@
                 }
             }
         } catch (error) {
-            console.error('Failed to fetch dashboard data:', error);
+            document.getElementById('activity-list').innerHTML = '<div class="text-center text-discord-red py-6 text-sm">Failed to load activity</div>';
         }
     }
 

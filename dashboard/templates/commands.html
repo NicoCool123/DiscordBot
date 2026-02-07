@@ -6,7 +6,7 @@
 {% block content %}
 <div class="space-y-6" x-data="commandsPage()">
     <!-- Guild Selector -->
-    <div class="card py-4">
+    <div class="card">
         <div class="flex flex-wrap items-center gap-4">
             <label class="label mb-0 flex-shrink-0">Select Server:</label>
             <div x-show="loadingGuilds" class="text-sm text-gray-400">Loading servers...</div>
@@ -100,10 +100,17 @@
                                 <td class="py-2.5 px-2" x-text="cmd.description"></td>
                                 <td class="py-2.5 px-2 max-w-[200px] truncate text-gray-500 hidden md:table-cell" x-text="cmd.response"></td>
                                 <td class="py-2.5 px-2 text-center">
-                                    <button @click="toggleCustomCommand(cmd)"
-                                        class="toggle" :class="cmd.enabled ? 'bg-discord-green' : 'bg-gray-300 dark:bg-gray-600'">
-                                        <span class="toggle-dot" :class="cmd.enabled ? 'translate-x-6' : 'translate-x-1'"></span>
-                                    </button>
+                                    <div class="flex items-center justify-center gap-2">
+                                        <svg x-show="togglingCmd === cmd.id" x-cloak class="animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <button @click="toggleCustomCommand(cmd)"
+                                            :disabled="togglingCmd === cmd.id"
+                                            class="toggle" :class="cmd.enabled ? 'bg-discord-green' : 'bg-gray-300 dark:bg-gray-600'">
+                                            <span class="toggle-dot" :class="cmd.enabled ? 'translate-x-6' : 'translate-x-1'"></span>
+                                        </button>
+                                    </div>
                                 </td>
                                 <td class="py-2.5 px-2 text-right">
                                     <button @click="deleteCommand(cmd)" class="text-red-400 hover:text-red-500 text-xs font-medium">Delete</button>
@@ -148,10 +155,17 @@
                                     ></span>
                                 </td>
                                 <td class="py-2.5 px-2 text-center">
-                                    <button @click="toggleBuiltinCommand(cmd)"
-                                        class="toggle" :class="cmd.enabled ? 'bg-discord-green' : 'bg-gray-300 dark:bg-gray-600'">
-                                        <span class="toggle-dot" :class="cmd.enabled ? 'translate-x-6' : 'translate-x-1'"></span>
-                                    </button>
+                                    <div class="flex items-center justify-center gap-2">
+                                        <svg x-show="togglingBuiltin === cmd.name" x-cloak class="animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <button @click="toggleBuiltinCommand(cmd)"
+                                            :disabled="togglingBuiltin === cmd.name"
+                                            class="toggle" :class="cmd.enabled ? 'bg-discord-green' : 'bg-gray-300 dark:bg-gray-600'">
+                                            <span class="toggle-dot" :class="cmd.enabled ? 'translate-x-6' : 'translate-x-1'"></span>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         </template>
@@ -185,6 +199,8 @@ function commandsPage() {
         loadingCommands: false,
         loadingBuiltin: false,
         creating: false,
+        togglingCmd: null,
+        togglingBuiltin: null,
         customCommands: [],
         builtinCommands: [],
         newCommand: { name: '', description: '', response: '', ephemeral: false },
@@ -199,10 +215,12 @@ function commandsPage() {
                 const res = await Auth.fetch('/api/v1/guilds/');
                 if (res.ok) {
                     const data = await res.json();
-                    this.guilds = data.guilds;
+                    this.guilds = data.guilds || [];
+                } else {
+                    showToast('Failed to load servers', 'error');
                 }
             } catch (e) {
-                console.error('Failed to load guilds:', e);
+                showToast('Failed to load servers', 'error');
             } finally {
                 this.loadingGuilds = false;
             }
@@ -245,6 +263,10 @@ function commandsPage() {
         },
 
         async createCommand() {
+            if (!/^[a-zA-Z0-9_-]+$/.test(this.newCommand.name)) {
+                showToast('Command name can only contain letters, numbers, hyphens and underscores', 'error');
+                return;
+            }
             this.creating = true;
             try {
                 const res = await Auth.fetch(`/api/v1/commands/${this.selectedGuild}`, {
@@ -266,6 +288,7 @@ function commandsPage() {
         },
 
         async toggleCustomCommand(cmd) {
+            this.togglingCmd = cmd.id;
             try {
                 const res = await Auth.fetch(`/api/v1/commands/${this.selectedGuild}/${cmd.id}`, {
                     method: 'PUT',
@@ -279,6 +302,8 @@ function commandsPage() {
                 }
             } catch (e) {
                 showToast('Failed to toggle command', 'error');
+            } finally {
+                this.togglingCmd = null;
             }
         },
 
@@ -300,6 +325,7 @@ function commandsPage() {
         },
 
         async toggleBuiltinCommand(cmd) {
+            this.togglingBuiltin = cmd.name;
             try {
                 const res = await Auth.fetch(`/api/v1/commands/${this.selectedGuild}/builtin/${cmd.name}`, {
                     method: 'PUT',
@@ -313,6 +339,8 @@ function commandsPage() {
                 }
             } catch (e) {
                 showToast('Failed to toggle command', 'error');
+            } finally {
+                this.togglingBuiltin = null;
             }
         }
     };

@@ -9,10 +9,11 @@
     <div class="card">
         <h3 class="text-base font-semibold mb-3">Select Server</h3>
         <div x-show="loadingGuilds" class="text-sm text-gray-400">Loading servers...</div>
-        <div x-show="!loadingGuilds && guilds.length === 0" x-cloak class="text-sm text-gray-400">
+        <div x-show="!loadingGuilds && guildsError" x-cloak class="text-sm text-discord-red" x-text="guildsError"></div>
+        <div x-show="!loadingGuilds && !guildsError && guilds.length === 0" x-cloak class="text-sm text-gray-400">
             No servers found. <a href="/api/v1/auth/discord" class="text-discord-blurple hover:underline">Login with Discord</a> to manage your servers.
         </div>
-        <select x-show="!loadingGuilds && guilds.length > 0" x-cloak x-model="selectedGuild" @change="loadSettings()" class="input max-w-md">
+        <select x-show="!loadingGuilds && guilds.length > 0" x-cloak x-model="selectedGuild" @change="switchGuild()" class="input max-w-md">
             <option value="">-- Select a server --</option>
             <template x-for="guild in guilds" :key="guild.id">
                 <option :value="guild.id" x-text="guild.name + (guild.bot_in_guild ? '' : ' (Bot not added)')"></option>
@@ -118,25 +119,32 @@
 {% block scripts %}
 <script>
 function settingsForm() {
+    const defaultSettings = {
+        prefix: '!',
+        language: 'en',
+        moderation_enabled: true,
+        logging_enabled: true,
+        welcome_enabled: false,
+        log_channel_id: '',
+        mod_log_channel_id: '',
+        welcome_channel_id: '',
+        welcome_message: '',
+    };
+
     return {
         guilds: [],
+        guildsError: '',
         loadingGuilds: true,
         selectedGuild: '',
-        settings: {
-            prefix: '!',
-            language: 'en',
-            moderation_enabled: true,
-            logging_enabled: true,
-            welcome_enabled: false,
-            log_channel_id: '',
-            mod_log_channel_id: '',
-            welcome_channel_id: '',
-            welcome_message: '',
-        },
-        originalSettings: {},
+        settings: { ...defaultSettings },
+        originalSettings: { ...defaultSettings },
         saving: false,
         message: '',
         messageType: '',
+
+        get hasUnsavedChanges() {
+            return JSON.stringify(this.settings) !== JSON.stringify(this.originalSettings);
+        },
 
         async init() {
             await this.fetchGuilds();
@@ -144,17 +152,31 @@ function settingsForm() {
 
         async fetchGuilds() {
             this.loadingGuilds = true;
+            this.guildsError = '';
             try {
                 const res = await Auth.fetch('/api/v1/guilds/');
                 if (res.ok) {
                     const data = await res.json();
-                    this.guilds = data.guilds;
+                    this.guilds = data.guilds || [];
+                } else {
+                    this.guildsError = 'Failed to load servers. Please try again.';
                 }
             } catch (e) {
-                console.error('Failed to load guilds:', e);
+                this.guildsError = 'Failed to load servers. Please try again.';
             } finally {
                 this.loadingGuilds = false;
             }
+        },
+
+        switchGuild() {
+            if (this.hasUnsavedChanges) {
+                if (!confirm('You have unsaved changes. Discard them?')) {
+                    this.selectedGuild = this._previousGuild || '';
+                    return;
+                }
+            }
+            this._previousGuild = this.selectedGuild;
+            this.loadSettings();
         },
 
         async loadSettings() {
@@ -164,10 +186,11 @@ function settingsForm() {
                 const response = await Auth.fetch(`/api/v1/settings/${this.selectedGuild}`);
                 if (response.ok) {
                     const data = await response.json();
-                    this.settings = { ...this.settings, ...data };
+                    this.settings = { ...defaultSettings, ...data };
                     this.originalSettings = { ...this.settings };
                 } else if (response.status === 404) {
-                    this.resetSettings();
+                    this.settings = { ...defaultSettings };
+                    this.originalSettings = { ...defaultSettings };
                 }
             } catch (error) {
                 this.showMessage('Failed to load settings', 'error');
@@ -179,11 +202,19 @@ function settingsForm() {
             this.message = '';
 
             try {
-                const response = await Auth.fetch(`/api/v1/settings/${this.selectedGuild}`, {
+                let response = await Auth.fetch(`/api/v1/settings/${this.selectedGuild}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(this.settings)
                 });
+
+                if (response.status === 404) {
+                    response = await Auth.fetch(`/api/v1/settings/${this.selectedGuild}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.settings)
+                    });
+                }
 
                 if (response.ok) {
                     this.originalSettings = { ...this.settings };

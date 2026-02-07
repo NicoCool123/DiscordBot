@@ -37,12 +37,20 @@
     @apply btn bg-discord-green text-white hover:bg-opacity-90 focus:ring-discord-green;
   }
 
+  .btn:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+
   .card {
     @apply bg-white dark:bg-discord-darker rounded-xl shadow-sm border border-gray-200 dark:border-gray-700/50 p-6;
   }
 
   .input {
     @apply w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-discord-dark text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-discord-blurple focus:border-transparent;
+  }
+
+  .input:disabled {
+    @apply opacity-50 cursor-not-allowed bg-gray-100 dark:bg-discord-darkest;
   }
 
   .label {

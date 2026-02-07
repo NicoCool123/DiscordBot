@@ -128,6 +128,26 @@
                     this.error = null;
                     this.success = null;
 
+                    if (this.password.length < 8) {
+                        this.error = 'Password must be at least 8 characters';
+                        this.loading = false;
+                        return;
+                    }
+                    if (!/[A-Z]/.test(this.password)) {
+                        this.error = 'Password must include an uppercase letter';
+                        this.loading = false;
+                        return;
+                    }
+                    if (!/[a-z]/.test(this.password)) {
+                        this.error = 'Password must include a lowercase letter';
+                        this.loading = false;
+                        return;
+                    }
+                    if (!/[0-9]/.test(this.password)) {
+                        this.error = 'Password must include a number';
+                        this.loading = false;
+                        return;
+                    }
                     if (this.password !== this.confirmPassword) {
                         this.error = 'Passwords do not match';
                         this.loading = false;

@@ -40,7 +40,16 @@ const Auth = {
             return false;
         }
     },
-    logout() {
+    async logout() {
+        try {
+            const token = this.getToken();
+            if (token) {
+                await fetch('/api/v1/auth/logout', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                });
+            }
+        } catch { /* ignore logout errors */ }
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         window.location.href = '/login';

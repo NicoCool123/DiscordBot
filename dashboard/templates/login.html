@@ -53,6 +53,12 @@
                         <p class="text-sm text-red-600 dark:text-red-400" x-text="error"></p>
                     </div>
 
+                    <!-- Info message (MFA) -->
+                    <div x-show="info" x-cloak x-transition class="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-lg">
+                        <svg class="w-4 h-4 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+                        <p class="text-sm text-blue-600 dark:text-blue-400" x-text="info"></p>
+                    </div>
+
                     <div>
                         <label for="username" class="label">Username or Email</label>
                         <input type="text" id="username" x-model="username" required class="input" placeholder="Enter your username or email">
@@ -64,7 +70,7 @@
                     </div>
 
                     <!-- MFA Code -->
-                    <div x-show="mfaRequired" x-cloak>
+                    <div x-show="mfaRequired" x-cloak x-transition>
                         <label for="mfa_code" class="label">MFA Code</label>
                         <input type="text" id="mfa_code" x-model="mfaCode" class="input" placeholder="Enter 6-digit code" maxlength="6" pattern="[0-9]{6}">
                     </div>
@@ -117,10 +123,12 @@
                 mfaRequired: false,
                 loading: false,
                 error: null,
+                info: null,
 
                 async submitForm() {
                     this.loading = true;
                     this.error = null;
+                    this.info = null;
 
                     try {
                         const endpoint = this.mfaRequired ? '/api/v1/auth/login/mfa' : '/api/v1/auth/login';
@@ -136,6 +144,8 @@
 
                         if (response.status === 428) {
                             this.mfaRequired = true;
+                            this.error = null;
+                            this.info = 'MFA verification required. Enter your 6-digit code.';
                             this.loading = false;
                             return;
                         }

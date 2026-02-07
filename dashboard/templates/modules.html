@@ -43,15 +43,20 @@
 
                     <div class="flex items-center justify-between">
                         <span x-show="module.is_core" class="text-xs text-gray-400">Core Module</span>
-                        <span x-show="!module.is_core"></span>
-                        <button
-                            @click="toggleModule(module)"
-                            :disabled="module.is_core || loading === module.name"
-                            class="toggle"
-                            :class="module.is_enabled ? 'bg-discord-green' : 'bg-gray-300 dark:bg-gray-600'"
-                        >
-                            <span class="toggle-dot" :class="module.is_enabled ? 'translate-x-6' : 'translate-x-1'"></span>
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <svg x-show="loading === module.name" x-cloak class="animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <button
+                                @click="toggleModule(module)"
+                                :disabled="module.is_core || loading === module.name"
+                                class="toggle"
+                                :class="module.is_enabled ? 'bg-discord-green' : 'bg-gray-300 dark:bg-gray-600'"
+                            >
+                                <span class="toggle-dot" :class="module.is_enabled ? 'translate-x-6' : 'translate-x-1'"></span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </template>
@@ -97,10 +102,12 @@ function modulesPage() {
                 const res = await Auth.fetch('/api/v1/guilds/');
                 if (res.ok) {
                     const data = await res.json();
-                    this.guilds = data.guilds;
+                    this.guilds = data.guilds || [];
+                } else {
+                    showToast('Failed to load servers', 'error');
                 }
             } catch (e) {
-                console.error('Failed to load guilds:', e);
+                showToast('Failed to load servers', 'error');
             } finally {
                 this.loadingGuilds = false;
             }
