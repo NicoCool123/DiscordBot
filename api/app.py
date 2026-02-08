@@ -140,6 +140,14 @@ class Application:
         async def commands(request: Request):
             return self.templates.TemplateResponse("commands.html", {"request": request, "active_page": "commands"})
 
+        @self.app.get("/minecraft")
+        async def minecraft(request: Request):
+            return self.templates.TemplateResponse("minecraft.html", {"request": request, "active_page": "minecraft"})
+
+        @self.app.get("/users")
+        async def users(request: Request):
+            return self.templates.TemplateResponse("users.html", {"request": request, "active_page": "users"})
+
         @self.app.get("/logout")
         async def logout():
             return RedirectResponse(url="/login")

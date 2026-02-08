@@ -1,189 +1,357 @@
 {% extends "base.html" %}
 
 {% block title %}Commands{% endblock %}
-{% block page_title %}Command Management{% endblock %}
+{% block page_title %}Commands{% endblock %}
 
 {% block content %}
 <div class="space-y-6" x-data="commandsPage()">
+
     <!-- Guild Selector -->
-    <div class="card">
-        <div class="flex flex-wrap items-center gap-4">
-            <label class="label mb-0 flex-shrink-0">Select Server:</label>
-            <div x-show="loadingGuilds" class="text-sm text-gray-400">Loading servers...</div>
-            <div x-show="!loadingGuilds && guilds.length === 0" x-cloak class="text-sm text-gray-400">
-                No servers found. <a href="/api/v1/auth/discord" class="text-discord-blurple hover:underline">Login with Discord</a> first.
+    <div class="card-static p-5">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-9 h-9 rounded-xl bg-[#5865f2]/10 flex items-center justify-center flex-shrink-0">
+                <svg class="w-[18px] h-[18px] text-[#5865f2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                </svg>
             </div>
-            <select x-show="!loadingGuilds && guilds.length > 0" x-cloak x-model="selectedGuild" @change="loadCommands()" class="input max-w-xs">
-                <option value="">-- Select a server --</option>
-                <template x-for="guild in guilds" :key="guild.id">
-                    <option :value="guild.id" x-text="guild.name + (guild.bot_in_guild ? '' : ' (Bot not added)')"></option>
-                </template>
-            </select>
+            <div>
+                <h3 class="text-sm font-semibold text-white">Select Server</h3>
+                <p class="text-xs text-[#64748b]">Choose a server to manage its commands</p>
+            </div>
         </div>
+
+        <!-- Loading guilds -->
+        <div x-show="!guilds.length && !selectedGuild" class="flex items-center gap-2 text-sm text-[#94a3b8] py-1">
+            <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Loading servers...</span>
+        </div>
+
+        <!-- Guild dropdown -->
+        <select
+            x-show="guilds.length > 0"
+            x-cloak
+            x-model="selectedGuild"
+            @change="loadCustomCommands(); loadBuiltinCommands()"
+            class="input-field max-w-md"
+        >
+            <option value="">-- Select a server --</option>
+            <template x-for="guild in guilds" :key="guild.id">
+                <option :value="guild.id" x-text="guild.name"></option>
+            </template>
+        </select>
     </div>
 
-    <!-- Tabs -->
-    <div x-show="selectedGuild" x-cloak class="border-b border-gray-200 dark:border-gray-700/50">
+    <!-- Tab Navigation -->
+    <div x-show="selectedGuild" x-cloak class="card-static px-5 pt-4 pb-0">
         <nav class="flex gap-6">
             <button
                 @click="activeTab = 'custom'"
-                :class="activeTab === 'custom' ? 'border-discord-blurple text-discord-blurple' : 'border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
-                class="pb-2.5 border-b-2 font-medium text-sm transition-colors"
-            >Custom Commands</button>
+                :class="activeTab === 'custom'
+                    ? 'border-[#5865f2] text-[#5865f2]'
+                    : 'border-transparent text-[#94a3b8] hover:text-[#e2e8f0]'"
+                class="pb-3.5 border-b-2 font-medium text-sm transition-all duration-200 flex items-center gap-2"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                Custom Commands
+                <span
+                    x-show="customCommands.length > 0"
+                    x-text="customCommands.length"
+                    class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none"
+                    :class="activeTab === 'custom' ? 'bg-[#5865f2]/10 text-[#5865f2]' : 'bg-white/5 text-[#94a3b8]'"
+                ></span>
+            </button>
             <button
                 @click="activeTab = 'builtin'"
-                :class="activeTab === 'builtin' ? 'border-discord-blurple text-discord-blurple' : 'border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
-                class="pb-2.5 border-b-2 font-medium text-sm transition-colors"
-            >Built-in Commands</button>
+                :class="activeTab === 'builtin'
+                    ? 'border-[#5865f2] text-[#5865f2]'
+                    : 'border-transparent text-[#94a3b8] hover:text-[#e2e8f0]'"
+                class="pb-3.5 border-b-2 font-medium text-sm transition-all duration-200 flex items-center gap-2"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                Built-in Commands
+                <span
+                    x-show="builtinCommands.length > 0"
+                    x-text="builtinCommands.length"
+                    class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none"
+                    :class="activeTab === 'builtin' ? 'bg-[#5865f2]/10 text-[#5865f2]' : 'bg-white/5 text-[#94a3b8]'"
+                ></span>
+            </button>
         </nav>
     </div>
 
-    <!-- Custom Commands Tab -->
+    <!-- ==================== Custom Commands Tab ==================== -->
     <div x-show="selectedGuild && activeTab === 'custom'" x-cloak class="space-y-6">
+
         <!-- Add Command Form -->
-        <div class="card">
-            <h3 class="text-base font-semibold mb-4">Add Custom Command</h3>
-            <form @submit.prevent="createCommand()" class="space-y-4">
+        <div class="card p-5">
+            <div class="flex items-center gap-3 mb-5">
+                <div class="w-9 h-9 rounded-xl bg-[#23a559]/10 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-[18px] h-[18px] text-[#23a559]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold text-white">Add Custom Command</h3>
+                    <p class="text-xs text-[#64748b]">Create a new slash command for your server</p>
+                </div>
+            </div>
+
+            <form @submit.prevent="addCommand()" class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="label">Command Name</label>
-                        <div class="flex items-center">
-                            <span class="text-gray-400 mr-1 text-sm">/</span>
-                            <input type="text" x-model="newCommand.name" class="input" placeholder="greet" maxlength="32" required>
+                        <label class="block text-xs font-medium text-[#94a3b8] uppercase tracking-wide mb-1.5">Command Name</label>
+                        <div class="relative">
+                            <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5865f2] font-mono font-semibold text-sm select-none">/</span>
+                            <input
+                                type="text"
+                                x-model="newCommand.name"
+                                class="input-field pl-7"
+                                placeholder="greet"
+                                maxlength="32"
+                                required
+                            >
                         </div>
                     </div>
                     <div>
-                        <label class="label">Description</label>
-                        <input type="text" x-model="newCommand.description" class="input" placeholder="Greets the user" maxlength="100" required>
+                        <label class="block text-xs font-medium text-[#94a3b8] uppercase tracking-wide mb-1.5">Description</label>
+                        <input
+                            type="text"
+                            x-model="newCommand.description"
+                            class="input-field"
+                            placeholder="Greets the user"
+                            maxlength="100"
+                            required
+                        >
                     </div>
                 </div>
+
                 <div>
-                    <label class="label">Response</label>
-                    <textarea x-model="newCommand.response" class="input" rows="3" placeholder="Hello {user}! Welcome to {server}!" maxlength="2000" required></textarea>
-                    <p class="mt-1 text-xs text-gray-400">Use {user} for username, {server} for server name</p>
+                    <label class="block text-xs font-medium text-[#94a3b8] uppercase tracking-wide mb-1.5">Response</label>
+                    <textarea
+                        x-model="newCommand.response"
+                        class="input-field resize-y"
+                        rows="3"
+                        placeholder="Hello {user}! Welcome to {server}!"
+                        maxlength="2000"
+                        required
+                    ></textarea>
+                    <p class="mt-1.5 text-[11px] text-[#64748b]">
+                        Use <code class="px-1 py-0.5 rounded bg-white/5 text-[#5865f2] font-mono">{user}</code> for username,
+                        <code class="px-1 py-0.5 rounded bg-white/5 text-[#5865f2] font-mono">{server}</code> for server name
+                    </p>
                 </div>
-                <div class="flex items-center gap-4">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" x-model="newCommand.ephemeral" class="rounded border-gray-300 dark:border-gray-600 text-discord-blurple focus:ring-discord-blurple bg-white dark:bg-discord-dark">
-                        <span class="text-sm text-gray-600 dark:text-gray-400">Ephemeral (only visible to user)</span>
+
+                <div class="flex items-center justify-between pt-1">
+                    <!-- Ephemeral Toggle -->
+                    <label class="flex items-center gap-3 cursor-pointer group">
+                        <button
+                            type="button"
+                            @click="newCommand.ephemeral = !newCommand.ephemeral"
+                            class="toggle"
+                            :class="newCommand.ephemeral ? 'bg-[#5865f2]' : 'bg-[#4b5563]'"
+                        >
+                            <span class="toggle-dot" :class="newCommand.ephemeral ? 'translate-x-6' : 'translate-x-1'"></span>
+                        </button>
+                        <div>
+                            <span class="text-sm text-[#e2e8f0] group-hover:text-white transition-colors">Ephemeral</span>
+                            <span class="text-xs text-[#64748b] ml-1">(only visible to user)</span>
+                        </div>
                     </label>
-                    <button type="submit" class="btn-primary text-sm ml-auto" :disabled="creating">
-                        <span x-show="!creating">Add Command</span>
-                        <span x-show="creating" x-cloak>Creating...</span>
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary shadow-lg shadow-[#5865f2]/20"
+                        :disabled="!newCommand.name || !newCommand.description || !newCommand.response"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Add Command
                     </button>
                 </div>
             </form>
         </div>
 
-        <!-- Commands List -->
-        <div class="card">
-            <h3 class="text-base font-semibold mb-4">Custom Commands</h3>
-            <div x-show="loadingCommands" class="text-center py-6 text-sm text-gray-400">Loading commands...</div>
-            <div x-show="!loadingCommands && customCommands.length === 0" x-cloak class="text-center py-6">
-                <p class="text-sm text-gray-400">No custom commands yet. Create one above!</p>
+        <!-- Custom Commands List -->
+        <div class="card-static p-5">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-semibold text-white">Custom Commands</h3>
+                <span
+                    x-show="customCommands.length > 0"
+                    x-text="customCommands.length + ' command' + (customCommands.length !== 1 ? 's' : '')"
+                    class="text-xs text-[#64748b] font-medium"
+                ></span>
             </div>
-            <div x-show="!loadingCommands && customCommands.length > 0" x-cloak class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-gray-200 dark:border-gray-700/50">
-                            <th class="text-left py-2.5 px-2 text-xs font-medium text-gray-400 uppercase">Command</th>
-                            <th class="text-left py-2.5 px-2 text-xs font-medium text-gray-400 uppercase">Description</th>
-                            <th class="text-left py-2.5 px-2 text-xs font-medium text-gray-400 uppercase hidden md:table-cell">Response</th>
-                            <th class="text-center py-2.5 px-2 text-xs font-medium text-gray-400 uppercase">Enabled</th>
-                            <th class="text-right py-2.5 px-2 text-xs font-medium text-gray-400 uppercase">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <template x-for="cmd in customCommands" :key="cmd.id">
-                            <tr class="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-discord-dark/50 transition-colors">
-                                <td class="py-2.5 px-2 font-mono text-discord-blurple text-xs" x-text="'/' + cmd.name"></td>
-                                <td class="py-2.5 px-2" x-text="cmd.description"></td>
-                                <td class="py-2.5 px-2 max-w-[200px] truncate text-gray-500 hidden md:table-cell" x-text="cmd.response"></td>
-                                <td class="py-2.5 px-2 text-center">
-                                    <div class="flex items-center justify-center gap-2">
-                                        <svg x-show="togglingCmd === cmd.id" x-cloak class="animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        <button @click="toggleCustomCommand(cmd)"
-                                            :disabled="togglingCmd === cmd.id"
-                                            class="toggle" :class="cmd.enabled ? 'bg-discord-green' : 'bg-gray-300 dark:bg-gray-600'">
-                                            <span class="toggle-dot" :class="cmd.enabled ? 'translate-x-6' : 'translate-x-1'"></span>
-                                        </button>
-                                    </div>
-                                </td>
-                                <td class="py-2.5 px-2 text-right">
-                                    <button @click="deleteCommand(cmd)" class="text-red-400 hover:text-red-500 text-xs font-medium">Delete</button>
-                                </td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
+
+            <!-- Loading State -->
+            <div x-show="loadingStates._customList" class="flex items-center justify-center gap-2 py-10 text-sm text-[#94a3b8]">
+                <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Loading commands...</span>
+            </div>
+
+            <!-- Empty State -->
+            <div x-show="!loadingStates._customList && customCommands.length === 0" x-cloak class="empty-state">
+                <svg class="text-[#64748b]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                <p class="text-sm font-medium text-[#94a3b8]">No custom commands yet</p>
+                <p class="text-xs text-[#64748b] mt-1">Create one using the form above</p>
+            </div>
+
+            <!-- Commands List -->
+            <div x-show="!loadingStates._customList && customCommands.length > 0" x-cloak class="space-y-2">
+                <template x-for="cmd in customCommands" :key="cmd.id">
+                    <div class="flex items-center justify-between gap-4 p-3.5 rounded-xl bg-[#0f0f23]/50 border border-white/[0.04] hover:border-white/[0.08] transition-all duration-200 group">
+                        <!-- Left: Command info -->
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2.5 mb-1">
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#5865f2]/10 font-mono text-[#5865f2] text-xs font-medium flex-shrink-0">
+                                    /<span x-text="cmd.name"></span>
+                                </span>
+                                <span x-show="cmd.ephemeral" class="badge badge-blurple">ephemeral</span>
+                            </div>
+                            <p class="text-xs text-[#94a3b8] truncate" x-text="cmd.description"></p>
+                            <p class="text-[11px] text-[#64748b] truncate mt-0.5 hidden sm:block" x-text="cmd.response"></p>
+                        </div>
+
+                        <!-- Right: Toggle + Delete -->
+                        <div class="flex items-center gap-3 flex-shrink-0">
+                            <!-- Toggle loading spinner -->
+                            <svg x-show="loadingStates['custom_' + cmd.id]" x-cloak class="animate-spin h-4 w-4 text-[#94a3b8]" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+
+                            <!-- Toggle switch -->
+                            <button
+                                @click="toggleCustomCommand(cmd)"
+                                :disabled="loadingStates['custom_' + cmd.id]"
+                                class="toggle"
+                                :class="cmd.enabled ? 'bg-[#23a559]' : 'bg-[#4b5563]'"
+                            >
+                                <span class="toggle-dot" :class="cmd.enabled ? 'translate-x-6' : 'translate-x-1'"></span>
+                            </button>
+
+                            <!-- Delete button -->
+                            <button
+                                @click="deleteCommand(cmd)"
+                                class="btn-danger px-2.5 py-1.5 rounded-lg text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center gap-1.5"
+                                :class="{'opacity-100': true}"
+                            >
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                                <span class="hidden sm:inline">Delete</span>
+                            </button>
+                        </div>
+                    </div>
+                </template>
             </div>
         </div>
     </div>
 
-    <!-- Built-in Commands Tab -->
+    <!-- ==================== Built-in Commands Tab ==================== -->
     <div x-show="selectedGuild && activeTab === 'builtin'" x-cloak class="space-y-6">
-        <div class="card">
-            <h3 class="text-base font-semibold mb-1">Built-in Commands</h3>
-            <p class="text-sm text-gray-400 mb-4">Toggle built-in bot commands on or off for this server.</p>
-            <div x-show="loadingBuiltin" class="text-center py-6 text-sm text-gray-400">Loading commands...</div>
-            <div x-show="!loadingBuiltin" x-cloak class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-gray-200 dark:border-gray-700/50">
-                            <th class="text-left py-2.5 px-2 text-xs font-medium text-gray-400 uppercase">Command</th>
-                            <th class="text-left py-2.5 px-2 text-xs font-medium text-gray-400 uppercase">Description</th>
-                            <th class="text-left py-2.5 px-2 text-xs font-medium text-gray-400 uppercase">Category</th>
-                            <th class="text-center py-2.5 px-2 text-xs font-medium text-gray-400 uppercase">Enabled</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <template x-for="cmd in builtinCommands" :key="cmd.name">
-                            <tr class="border-b border-gray-100 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-discord-dark/50 transition-colors">
-                                <td class="py-2.5 px-2 font-mono text-discord-blurple text-xs" x-text="'/' + cmd.name"></td>
-                                <td class="py-2.5 px-2" x-text="cmd.description"></td>
-                                <td class="py-2.5 px-2">
-                                    <span class="px-2 py-0.5 rounded-full text-xs font-medium"
-                                        :class="{
-                                            'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400': cmd.cog === 'moderation',
-                                            'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400': cmd.cog === 'minecraft',
-                                            'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400': cmd.cog === 'admin'
-                                        }"
-                                        x-text="cmd.cog"
-                                    ></span>
-                                </td>
-                                <td class="py-2.5 px-2 text-center">
-                                    <div class="flex items-center justify-center gap-2">
-                                        <svg x-show="togglingBuiltin === cmd.name" x-cloak class="animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        <button @click="toggleBuiltinCommand(cmd)"
-                                            :disabled="togglingBuiltin === cmd.name"
-                                            class="toggle" :class="cmd.enabled ? 'bg-discord-green' : 'bg-gray-300 dark:bg-gray-600'">
-                                            <span class="toggle-dot" :class="cmd.enabled ? 'translate-x-6' : 'translate-x-1'"></span>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
+        <div class="card-static p-5">
+            <div class="flex items-center gap-3 mb-5">
+                <div class="w-9 h-9 rounded-xl bg-[#f0b232]/10 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-[18px] h-[18px] text-[#f0b232]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold text-white">Built-in Commands</h3>
+                    <p class="text-xs text-[#64748b]">Toggle built-in bot commands on or off for this server</p>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div x-show="loadingStates._builtinList" class="flex items-center justify-center gap-2 py-10 text-sm text-[#94a3b8]">
+                <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Loading commands...</span>
+            </div>
+
+            <!-- Empty State -->
+            <div x-show="!loadingStates._builtinList && builtinCommands.length === 0" x-cloak class="empty-state">
+                <svg class="text-[#64748b]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                </svg>
+                <p class="text-sm font-medium text-[#94a3b8]">No built-in commands found</p>
+                <p class="text-xs text-[#64748b] mt-1">The bot may not have any registered commands for this server</p>
+            </div>
+
+            <!-- Built-in Commands List -->
+            <div x-show="!loadingStates._builtinList && builtinCommands.length > 0" x-cloak class="space-y-2">
+                <template x-for="cmd in builtinCommands" :key="cmd.name">
+                    <div class="flex items-center justify-between gap-4 p-3.5 rounded-xl bg-[#0f0f23]/50 border border-white/[0.04] hover:border-white/[0.08] transition-all duration-200">
+                        <!-- Left: Command info -->
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2.5 mb-1 flex-wrap">
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#5865f2]/10 font-mono text-[#5865f2] text-xs font-medium flex-shrink-0">
+                                    /<span x-text="cmd.name"></span>
+                                </span>
+                                <!-- Cog category badge -->
+                                <span
+                                    class="badge"
+                                    :class="{
+                                        'badge-red': cmd.cog === 'moderation',
+                                        'badge-green': cmd.cog === 'minecraft',
+                                        'badge-blurple': cmd.cog === 'admin',
+                                        'badge-yellow': cmd.cog === 'fun' || cmd.cog === 'utility',
+                                        'badge-gray': cmd.cog !== 'moderation' && cmd.cog !== 'minecraft' && cmd.cog !== 'admin' && cmd.cog !== 'fun' && cmd.cog !== 'utility'
+                                    }"
+                                    x-text="cmd.cog"
+                                ></span>
+                            </div>
+                            <p class="text-xs text-[#94a3b8] truncate" x-text="cmd.description"></p>
+                        </div>
+
+                        <!-- Right: Toggle -->
+                        <div class="flex items-center gap-3 flex-shrink-0">
+                            <!-- Toggle loading spinner -->
+                            <svg x-show="loadingStates['builtin_' + cmd.name]" x-cloak class="animate-spin h-4 w-4 text-[#94a3b8]" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+
+                            <!-- Toggle switch -->
+                            <button
+                                @click="toggleBuiltinCommand(cmd)"
+                                :disabled="loadingStates['builtin_' + cmd.name]"
+                                class="toggle"
+                                :class="cmd.enabled ? 'bg-[#23a559]' : 'bg-[#4b5563]'"
+                            >
+                                <span class="toggle-dot" :class="cmd.enabled ? 'translate-x-6' : 'translate-x-1'"></span>
+                            </button>
+                        </div>
+                    </div>
+                </template>
             </div>
         </div>
     </div>
 
-    <!-- No guild selected -->
-    <div x-show="!selectedGuild && !loadingGuilds" x-cloak class="card text-center py-10">
-        <svg class="w-10 h-10 mx-auto text-gray-300 dark:text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-        </svg>
-        <p class="text-sm text-gray-400">Select a server above to manage commands.</p>
-        <p x-show="!loadingGuilds && guilds.length === 0" class="text-xs text-gray-400 mt-1">
-            No servers found. Make sure you've logged in with Discord.
-        </p>
+    <!-- ==================== No Guild Selected Empty State ==================== -->
+    <div x-show="!selectedGuild" x-cloak class="card-static empty-state py-16">
+        <div class="w-16 h-16 mb-5 rounded-2xl bg-gradient-to-br from-[#5865f2]/10 to-[#eb459e]/10 flex items-center justify-center">
+            <svg class="w-8 h-8 text-[#5865f2] !opacity-100 !mb-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+        </div>
+        <h3 class="text-base font-semibold text-[#e2e8f0] mb-1.5">No Server Selected</h3>
+        <p class="text-sm text-[#64748b] max-w-sm">Select a server above to view and manage its slash commands.</p>
     </div>
 </div>
 {% endblock %}
@@ -195,22 +363,16 @@ function commandsPage() {
         guilds: [],
         selectedGuild: '',
         activeTab: 'custom',
-        loadingGuilds: true,
-        loadingCommands: false,
-        loadingBuiltin: false,
-        creating: false,
-        togglingCmd: null,
-        togglingBuiltin: null,
         customCommands: [],
         builtinCommands: [],
         newCommand: { name: '', description: '', response: '', ephemeral: false },
+        loadingStates: {},
 
         async init() {
             await this.loadGuilds();
         },
 
         async loadGuilds() {
-            this.loadingGuilds = true;
             try {
                 const res = await Auth.fetch('/api/v1/guilds/');
                 if (res.ok) {
@@ -221,53 +383,51 @@ function commandsPage() {
                 }
             } catch (e) {
                 showToast('Failed to load servers', 'error');
-            } finally {
-                this.loadingGuilds = false;
             }
         },
 
-        async loadCommands() {
-            if (!this.selectedGuild) return;
-            this.loadCustomCommands();
-            this.loadBuiltinCommands();
-        },
-
         async loadCustomCommands() {
-            this.loadingCommands = true;
+            if (!this.selectedGuild) { this.customCommands = []; return; }
+            this.loadingStates._customList = true;
             try {
                 const res = await Auth.fetch(`/api/v1/commands/${this.selectedGuild}`);
                 if (res.ok) {
                     const data = await res.json();
-                    this.customCommands = data.commands;
+                    this.customCommands = data.commands || [];
+                } else {
+                    showToast('Failed to load custom commands', 'error');
                 }
             } catch (e) {
                 showToast('Failed to load custom commands', 'error');
             } finally {
-                this.loadingCommands = false;
+                this.loadingStates._customList = false;
             }
         },
 
         async loadBuiltinCommands() {
-            this.loadingBuiltin = true;
+            if (!this.selectedGuild) { this.builtinCommands = []; return; }
+            this.loadingStates._builtinList = true;
             try {
                 const res = await Auth.fetch(`/api/v1/commands/${this.selectedGuild}/builtin`);
                 if (res.ok) {
                     const data = await res.json();
-                    this.builtinCommands = data.commands;
+                    this.builtinCommands = data.commands || [];
+                } else {
+                    showToast('Failed to load built-in commands', 'error');
                 }
             } catch (e) {
                 showToast('Failed to load built-in commands', 'error');
             } finally {
-                this.loadingBuiltin = false;
+                this.loadingStates._builtinList = false;
             }
         },
 
-        async createCommand() {
+        async addCommand() {
             if (!/^[a-zA-Z0-9_-]+$/.test(this.newCommand.name)) {
                 showToast('Command name can only contain letters, numbers, hyphens and underscores', 'error');
                 return;
             }
-            this.creating = true;
+            this.loadingStates._creating = true;
             try {
                 const res = await Auth.fetch(`/api/v1/commands/${this.selectedGuild}`, {
                     method: 'POST',
@@ -283,12 +443,12 @@ function commandsPage() {
             } catch (e) {
                 showToast(e.message, 'error');
             } finally {
-                this.creating = false;
+                this.loadingStates._creating = false;
             }
         },
 
         async toggleCustomCommand(cmd) {
-            this.togglingCmd = cmd.id;
+            this.loadingStates['custom_' + cmd.id] = true;
             try {
                 const res = await Auth.fetch(`/api/v1/commands/${this.selectedGuild}/${cmd.id}`, {
                     method: 'PUT',
@@ -297,35 +457,19 @@ function commandsPage() {
                 });
                 if (res.ok) {
                     cmd.enabled = !cmd.enabled;
+                    showToast(`Command /${cmd.name} ${cmd.enabled ? 'enabled' : 'disabled'}`, 'success');
                 } else {
                     showToast('Failed to toggle command', 'error');
                 }
             } catch (e) {
                 showToast('Failed to toggle command', 'error');
             } finally {
-                this.togglingCmd = null;
-            }
-        },
-
-        async deleteCommand(cmd) {
-            if (!confirm(`Delete command /${cmd.name}?`)) return;
-            try {
-                const res = await Auth.fetch(`/api/v1/commands/${this.selectedGuild}/${cmd.id}`, {
-                    method: 'DELETE'
-                });
-                if (res.ok) {
-                    showToast(`Command /${cmd.name} deleted`, 'success');
-                    await this.loadCustomCommands();
-                } else {
-                    showToast('Failed to delete command', 'error');
-                }
-            } catch (e) {
-                showToast('Failed to delete command', 'error');
+                delete this.loadingStates['custom_' + cmd.id];
             }
         },
 
         async toggleBuiltinCommand(cmd) {
-            this.togglingBuiltin = cmd.name;
+            this.loadingStates['builtin_' + cmd.name] = true;
             try {
                 const res = await Auth.fetch(`/api/v1/commands/${this.selectedGuild}/builtin/${cmd.name}`, {
                     method: 'PUT',
@@ -334,13 +478,34 @@ function commandsPage() {
                 });
                 if (res.ok) {
                     cmd.enabled = !cmd.enabled;
+                    showToast(`Command /${cmd.name} ${cmd.enabled ? 'enabled' : 'disabled'}`, 'success');
                 } else {
                     showToast('Failed to toggle command', 'error');
                 }
             } catch (e) {
                 showToast('Failed to toggle command', 'error');
             } finally {
-                this.togglingBuiltin = null;
+                delete this.loadingStates['builtin_' + cmd.name];
+            }
+        },
+
+        async deleteCommand(cmd) {
+            if (!confirm(`Delete command /${cmd.name}? This cannot be undone.`)) return;
+            this.loadingStates['delete_' + cmd.id] = true;
+            try {
+                const res = await Auth.fetch(`/api/v1/commands/${this.selectedGuild}/${cmd.id}`, {
+                    method: 'DELETE'
+                });
+                if (res.ok) {
+                    showToast(`Command /${cmd.name} deleted`, 'success');
+                    this.customCommands = this.customCommands.filter(c => c.id !== cmd.id);
+                } else {
+                    showToast('Failed to delete command', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to delete command', 'error');
+            } finally {
+                delete this.loadingStates['delete_' + cmd.id];
             }
         }
     };

@@ -6,13 +6,11 @@ class WebSocketManager {
         this.reconnectDelay = 3000;
     }
 
-    // --- connect-Methode mit Auth ---
     async connect(channel, options = {}) {
         if (this.connections.has(channel)) {
             return this.connections.get(channel);
         }
 
-        // Sicherstellen, dass Token gültig ist
         if (!Auth.isAuthenticated()) {
             const refreshed = await Auth.refreshToken();
             if (!refreshed) {
@@ -21,7 +19,7 @@ class WebSocketManager {
             }
         }
 
-        const token = localStorage.getItem("access_token");
+        const token = localStorage.getItem('access_token');
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const baseUrl = `${protocol}//${window.location.host}/ws`;
         const url = `${baseUrl}/${channel}?token=${token}`;
@@ -31,6 +29,7 @@ class WebSocketManager {
         ws.onopen = () => {
             console.log(`WebSocket connected: ${channel}`);
             this.reconnectAttempts.set(channel, 0);
+            window.dispatchEvent(new CustomEvent('ws:connected', { detail: { channel } }));
             if (options.onOpen) options.onOpen();
         };
 
@@ -46,6 +45,7 @@ class WebSocketManager {
         ws.onclose = (event) => {
             console.log(`WebSocket closed: ${channel}`, event.code);
             this.connections.delete(channel);
+            window.dispatchEvent(new CustomEvent('ws:disconnected', { detail: { channel, code: event.code } }));
             if (options.onClose) options.onClose(event);
 
             if (event.code !== 1000 && event.code !== 4001) {
@@ -67,6 +67,7 @@ class WebSocketManager {
 
         if (attempts >= this.maxReconnectAttempts) {
             console.log(`Max reconnect attempts reached for ${channel}`);
+            window.dispatchEvent(new CustomEvent('ws:max-retries', { detail: { channel } }));
             return;
         }
 
@@ -108,10 +109,8 @@ class WebSocketManager {
     }
 }
 
-// Einmalige globale Instanz
 window.wsManager = new WebSocketManager();
 
-// Close all WS connections when leaving page
 window.addEventListener('beforeunload', () => {
     window.wsManager.closeAll();
 });

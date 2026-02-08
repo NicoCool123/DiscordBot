@@ -5,12 +5,14 @@
 
 {% block content %}
 <div class="space-y-4" x-data="logsPage()">
+
     <!-- Controls -->
-    <div class="card py-4">
+    <div class="card p-4">
         <div class="flex flex-wrap items-center gap-3">
+            <!-- Level Filter -->
             <div class="flex items-center gap-2">
-                <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Level:</label>
-                <select x-model="minLevel" @change="filterLogs()" class="input w-28 py-1.5 text-sm">
+                <label class="text-xs font-medium text-[#94a3b8]">Level</label>
+                <select x-model="minLevel" class="input-field text-sm py-1.5 px-3 w-32">
                     <option value="DEBUG">DEBUG</option>
                     <option value="INFO">INFO</option>
                     <option value="WARNING">WARNING</option>
@@ -19,55 +21,58 @@
                 </select>
             </div>
 
+            <!-- Auto-scroll -->
             <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" x-model="autoScroll" class="rounded border-gray-300 dark:border-gray-600 text-discord-blurple focus:ring-discord-blurple bg-white dark:bg-discord-dark">
-                <span class="text-sm text-gray-600 dark:text-gray-400">Auto-scroll</span>
+                <button type="button" @click="autoScroll = !autoScroll"
+                        class="toggle" :class="autoScroll ? 'bg-[#5865f2]' : 'bg-white/10'">
+                    <span class="toggle-dot ml-0.5" :class="autoScroll ? 'translate-x-5' : 'translate-x-0'"></span>
+                </button>
+                <span class="text-xs font-medium text-[#94a3b8]">Auto-scroll</span>
             </label>
 
             <div class="flex-1"></div>
 
-            <div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-discord-dark">
-                <span class="w-2 h-2 rounded-full" :class="connected ? 'bg-discord-green' : 'bg-discord-red'"></span>
-                <span class="text-xs font-medium" :class="connected ? 'text-discord-green' : 'text-gray-400'" x-text="connected ? 'Connected' : 'Disconnected'"></span>
+            <!-- Connection Status -->
+            <div class="flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full" :class="connected ? 'status-dot-online' : 'status-dot-offline'"></div>
+                <span class="text-xs font-medium" :class="connected ? 'text-[#23a559]' : 'text-[#f23f43]'"
+                      x-text="connected ? 'Connected' : 'Disconnected'"></span>
             </div>
 
-            <span class="text-xs text-gray-400 px-2 py-1 bg-gray-50 dark:bg-discord-dark rounded-lg" x-text="filteredLogs.length + ' entries'"></span>
+            <!-- Entry count -->
+            <span class="badge badge-blurple" x-text="`${filteredLogs.length} entries`"></span>
 
-            <button @click="clearLogs()" class="btn-secondary text-xs py-1.5 px-3">Clear</button>
-            <button @click="reconnect()" class="btn-primary text-xs py-1.5 px-3" x-show="!connected" x-cloak>Reconnect</button>
+            <!-- Buttons -->
+            <button @click="clearLogs()" class="btn btn-ghost text-xs py-1.5 px-3">Clear</button>
+            <button x-show="!connected" @click="reconnect()" class="btn btn-primary text-xs py-1.5 px-3">Reconnect</button>
         </div>
     </div>
 
     <!-- Log Output -->
-    <div class="card p-0 overflow-hidden">
-        <div
-            class="bg-gray-950 dark:bg-[#1a1b1e] p-4 h-[calc(100vh-16rem)] min-h-[300px] overflow-y-auto font-mono text-xs leading-relaxed scrollbar-thin"
-            x-ref="logContainer"
-        >
-            <template x-for="(log, index) in filteredLogs" :key="index">
-                <div class="py-0.5 flex gap-2 hover:bg-white/5 px-1 rounded">
-                    <span class="text-gray-600 flex-shrink-0 select-none" x-text="formatTimestamp(log.timestamp)"></span>
-                    <span
-                        class="px-1 py-0 rounded text-[10px] font-bold uppercase flex-shrink-0 leading-5"
-                        :class="{
-                            'text-gray-500': log.level === 'DEBUG',
-                            'text-blue-400': log.level === 'INFO',
-                            'text-yellow-400': log.level === 'WARNING',
-                            'text-red-400': log.level === 'ERROR',
-                            'text-red-300 bg-red-900/30': log.level === 'CRITICAL'
-                        }"
-                        x-text="log.level.padEnd(8)"
-                    ></span>
-                    <span class="text-gray-300" x-text="log.message"></span>
+    <div class="card overflow-hidden">
+        <div class="log-container p-4 h-[calc(100vh-280px)] overflow-y-auto scrollbar-thin" x-ref="logContainer">
+            <template x-if="filteredLogs.length === 0">
+                <div class="flex items-center justify-center h-full text-[#64748b]">
+                    <div class="text-center">
+                        <p class="text-sm">Waiting for logs...</p>
+                        <span class="inline-block w-2 h-4 bg-[#64748b] ml-1 animate-blink"></span>
+                    </div>
                 </div>
             </template>
-
-            <div x-show="filteredLogs.length === 0" class="text-center text-gray-600 py-12">
-                <svg class="w-8 h-8 mx-auto mb-2 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
-                Waiting for logs...
-            </div>
+            <template x-for="(log, i) in filteredLogs" :key="i">
+                <div class="flex gap-3 py-0.5 hover:bg-white/[0.02] px-1 rounded">
+                    <span class="text-[#64748b] flex-shrink-0 select-none" x-text="formatTime(log.timestamp)"></span>
+                    <span class="flex-shrink-0 font-semibold w-16 text-right"
+                          :class="{
+                              'text-[#94a3b8]': log.level === 'DEBUG',
+                              'text-[#5865f2]': log.level === 'INFO',
+                              'text-[#f0b232]': log.level === 'WARNING',
+                              'text-[#f23f43]': log.level === 'ERROR',
+                              'text-[#eb459e]': log.level === 'CRITICAL',
+                          }" x-text="log.level"></span>
+                    <span class="text-[#e2e8f0] break-all" x-text="log.message"></span>
+                </div>
+            </template>
         </div>
     </div>
 </div>
@@ -78,72 +83,58 @@
 function logsPage() {
     return {
         logs: [],
-        filteredLogs: [],
-        minLevel: 'INFO',
+        minLevel: 'DEBUG',
         autoScroll: true,
         connected: false,
+        maxLogs: 1000,
+
         levelPriority: { DEBUG: 0, INFO: 1, WARNING: 2, ERROR: 3, CRITICAL: 4 },
 
-        init() {
-            this.connect();
+        get filteredLogs() {
+            const minPriority = this.levelPriority[this.minLevel] || 0;
+            return this.logs.filter(l => (this.levelPriority[l.level] || 0) >= minPriority);
         },
 
-        connect() {
+        async init() {
+            this.connectWs();
+        },
+
+        connectWs() {
             window.wsManager.connect('logs', {
-                onOpen: () => {
-                    this.connected = true;
-                    this.addLog({ level: 'INFO', message: 'Connected to log stream', timestamp: new Date().toISOString() });
-                },
+                onOpen: () => { this.connected = true; },
                 onMessage: (data) => {
-                    if (data.type === 'log') {
-                        this.addLog(data.data);
+                    if (data.type === 'log' && data.data) {
+                        this.logs.push(data.data);
+                        if (this.logs.length > this.maxLogs) {
+                            this.logs = this.logs.slice(-this.maxLogs);
+                        }
+                        if (this.autoScroll) {
+                            this.$nextTick(() => {
+                                const container = this.$refs.logContainer;
+                                if (container) container.scrollTop = container.scrollHeight;
+                            });
+                        }
                     }
                 },
-                onClose: () => {
-                    this.connected = false;
-                    this.addLog({ level: 'WARNING', message: 'Disconnected from log stream', timestamp: new Date().toISOString() });
-                },
-                onError: () => {
-                    this.connected = false;
-                }
+                onClose: () => { this.connected = false; },
+                onError: () => { this.connected = false; }
             });
         },
 
         reconnect() {
             window.wsManager.close('logs');
-            this.connect();
-        },
-
-        addLog(log) {
-            this.logs.push(log);
-            if (this.logs.length > 1000) {
-                this.logs.shift();
-            }
-            this.filterLogs();
-
-            if (this.autoScroll) {
-                this.$nextTick(() => {
-                    const container = this.$refs.logContainer;
-                    if (container) container.scrollTop = container.scrollHeight;
-                });
-            }
-        },
-
-        filterLogs() {
-            const minPriority = this.levelPriority[this.minLevel];
-            this.filteredLogs = this.logs.filter(log =>
-                this.levelPriority[log.level] >= minPriority
-            );
+            window.wsManager.reconnectAttempts.delete('logs');
+            this.connectWs();
         },
 
         clearLogs() {
             this.logs = [];
-            this.filteredLogs = [];
         },
 
-        formatTimestamp(timestamp) {
-            const date = new Date(timestamp);
-            return date.toLocaleTimeString('en-US', { hour12: false });
+        formatTime(ts) {
+            if (!ts) return '--:--:--';
+            const d = new Date(ts);
+            return d.toLocaleTimeString('en-US', { hour12: false });
         },
 
         destroy() {

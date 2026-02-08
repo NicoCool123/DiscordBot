@@ -1,20 +1,33 @@
 /**
  * Main application JavaScript
+ * Alpine.js store for toasts + bot status checker + utility functions
  */
+
+// Register Alpine.js stores before Alpine initializes
+document.addEventListener('alpine:init', () => {
+    Alpine.store('toasts', {
+        list: [],
+        nextId: 0,
+        add(detail) {
+            const id = this.nextId++;
+            this.list.push({ id, message: detail.message, type: detail.type || 'info' });
+            setTimeout(() => this.remove(id), 4000);
+        },
+        remove(id) {
+            this.list = this.list.filter(t => t.id !== id);
+        }
+    });
+});
 
 // Initialize bot status checker
 document.addEventListener('DOMContentLoaded', () => {
-    // Skip on login/register pages
     if (window.location.pathname.startsWith('/login') ||
         window.location.pathname.startsWith('/register')) {
         return;
     }
 
-    // Check bot status periodically
     checkBotStatus();
     setInterval(checkBotStatus, 30000);
-
-    // Connect to status WebSocket for real-time updates
     connectStatusWebSocket();
 });
 
@@ -24,7 +37,6 @@ document.addEventListener('DOMContentLoaded', () => {
 async function checkBotStatus() {
     const indicator = document.getElementById('status-indicator');
     const statusText = document.getElementById('status-text');
-
     if (!indicator || !statusText) return;
 
     try {
@@ -46,15 +58,16 @@ async function checkBotStatus() {
 function updateStatusDisplay(online, latencyMs = null) {
     const indicator = document.getElementById('status-indicator');
     const statusText = document.getElementById('status-text');
-
     if (!indicator || !statusText) return;
 
     if (online) {
-        indicator.className = 'w-2 h-2 rounded-full bg-discord-green';
-        statusText.textContent = latencyMs != null ? `Online (${Number(latencyMs).toFixed(0)}ms)` : 'Online';
+        indicator.className = 'status-dot-online';
+        statusText.textContent = latencyMs != null ? `${Number(latencyMs).toFixed(0)}ms` : 'Online';
+        statusText.className = 'text-xs font-medium text-[#23a559]';
     } else {
-        indicator.className = 'w-2 h-2 rounded-full bg-discord-red';
+        indicator.className = 'status-dot-offline';
         statusText.textContent = 'Offline';
+        statusText.className = 'text-xs font-medium text-[#64748b]';
     }
 }
 
@@ -78,6 +91,7 @@ function connectStatusWebSocket() {
  * Format a number with commas
  */
 function formatNumber(num) {
+    if (num == null) return '-';
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
@@ -86,11 +100,9 @@ function formatNumber(num) {
  */
 function formatBytes(bytes, decimals = 2) {
     if (bytes === 0) return '0 Bytes';
-
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-
     return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + ' ' + sizes[i];
 }
 
@@ -98,6 +110,7 @@ function formatBytes(bytes, decimals = 2) {
  * Format duration in seconds to human readable
  */
 function formatDuration(seconds) {
+    if (seconds == null) return '-';
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -113,42 +126,28 @@ function formatDuration(seconds) {
 }
 
 /**
- * Show a toast notification
+ * Show a toast notification via Alpine store or DOM fallback
  */
 function showToast(message, type = 'info') {
-    let container = document.getElementById('toast-container');
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'toast-container';
-        container.className = 'fixed bottom-4 right-4 z-50 flex flex-col-reverse gap-2';
-        document.body.appendChild(container);
-    }
+    window.dispatchEvent(new CustomEvent('toast', { detail: { message, type } }));
+}
 
-    const toast = document.createElement('div');
-    toast.className = 'px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 translate-y-full opacity-0';
+/**
+ * Escape HTML to prevent XSS
+ */
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
 
-    const colors = {
-        success: 'bg-discord-green text-white',
-        error: 'bg-discord-red text-white',
-        warning: 'bg-discord-yellow text-black',
-        info: 'bg-discord-blurple text-white',
-    };
-
-    toast.className += ` ${colors[type] || colors.info}`;
-    toast.textContent = message;
-
-    container.appendChild(toast);
-
-    // Animate in
-    requestAnimationFrame(() => {
-        toast.classList.remove('translate-y-full', 'opacity-0');
-    });
-
-    // Remove after 3 seconds
-    setTimeout(() => {
-        toast.classList.add('translate-y-full', 'opacity-0');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
+/**
+ * Get color for progress bars based on percentage
+ */
+function getBarColor(percent) {
+    if (percent >= 80) return '#f23f43';
+    if (percent >= 60) return '#f0b232';
+    return '#23a559';
 }
 
 // Export utilities
@@ -156,3 +155,5 @@ window.formatNumber = formatNumber;
 window.formatBytes = formatBytes;
 window.formatDuration = formatDuration;
 window.showToast = showToast;
+window.escapeHtml = escapeHtml;
+window.getBarColor = getBarColor;

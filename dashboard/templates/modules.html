@@ -1,60 +1,151 @@
 {% extends "base.html" %}
 
 {% block title %}Modules{% endblock %}
-{% block page_title %}Module Management{% endblock %}
+{% block page_title %}Modules{% endblock %}
 
 {% block content %}
 <div class="space-y-6" x-data="modulesPage()">
+
     <!-- Guild Selector -->
-    <div class="card">
-        <div class="flex flex-wrap items-center gap-4">
-            <label class="label mb-0 flex-shrink-0">Select Server:</label>
-            <div x-show="loadingGuilds" class="text-sm text-gray-400">Loading servers...</div>
-            <div x-show="!loadingGuilds && guilds.length === 0" x-cloak class="text-sm text-gray-400">
-                No servers found. <a href="/api/v1/auth/discord" class="text-discord-blurple hover:underline">Login with Discord</a> first.
+    <div class="card p-5">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-9 h-9 rounded-xl bg-[#5865f2]/10 flex items-center justify-center flex-shrink-0">
+                <svg class="w-[18px] h-[18px] text-[#5865f2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/>
+                </svg>
             </div>
-            <select x-show="!loadingGuilds && guilds.length > 0" x-cloak x-model="selectedGuild" @change="fetchModules()" class="input max-w-xs">
-                <option value="">-- Select a server --</option>
-                <template x-for="guild in guilds" :key="guild.id">
-                    <option :value="guild.id" x-text="guild.name"></option>
-                </template>
-            </select>
+            <div>
+                <h3 class="text-sm font-semibold text-white">Select Server</h3>
+                <p class="text-xs text-[#64748b]">Choose a server to manage module availability</p>
+            </div>
         </div>
+
+        <!-- Loading guilds -->
+        <div x-show="loading" class="flex items-center gap-2 text-sm text-[#94a3b8] py-1">
+            <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Loading servers...</span>
+        </div>
+
+        <!-- No guilds -->
+        <div x-show="!loading && guilds.length === 0" x-cloak class="text-sm text-[#94a3b8] py-1">
+            No servers found.
+            <a href="/api/v1/auth/discord" class="text-[#5865f2] hover:underline font-medium">Login with Discord</a> first.
+        </div>
+
+        <!-- Guild dropdown -->
+        <select
+            x-show="!loading && guilds.length > 0"
+            x-cloak
+            x-model="selectedGuild"
+            @change="fetchModules()"
+            class="input-field max-w-md"
+        >
+            <option value="">-- Select a server --</option>
+            <template x-for="guild in guilds" :key="guild.id">
+                <option :value="guild.id" x-text="guild.name"></option>
+            </template>
+        </select>
+    </div>
+
+    <!-- Info Note -->
+    <div x-show="selectedGuild" x-cloak class="card-static p-4 flex items-start gap-3">
+        <svg class="w-5 h-5 text-[#5865f2] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <p class="text-sm text-[#94a3b8]">
+            Modules are bot-wide. Select a guild to enable or disable modules for that server.
+        </p>
     </div>
 
     <!-- Module Grid -->
     <div x-show="selectedGuild" x-cloak>
-        <div x-show="loadingModules" class="text-center py-8 text-gray-400 text-sm">Loading modules...</div>
 
-        <div x-show="!loadingModules && modules.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <template x-for="module in modules" :key="module.name">
-                <div class="card hover:border-gray-300 dark:hover:border-gray-600 transition-colors">
-                    <div class="flex items-start justify-between mb-3">
-                        <div>
-                            <h3 class="font-semibold text-sm" x-text="module.display_name"></h3>
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1"
-                                :class="module.is_enabled ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'"
-                                x-text="module.is_enabled ? 'Enabled' : 'Disabled'"></span>
+        <!-- Loading modules -->
+        <div x-show="loading" class="card empty-state">
+            <svg class="animate-spin h-8 w-8 text-[#5865f2]" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-sm text-[#94a3b8]">Loading modules...</p>
+        </div>
+
+        <!-- Module cards -->
+        <div x-show="!loading && modules.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <template x-for="mod in modules" :key="mod.name">
+                <div class="card p-5 flex flex-col justify-between">
+
+                    <!-- Header -->
+                    <div>
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="flex flex-col gap-1.5">
+                                <h3 class="font-semibold text-sm text-white" x-text="mod.display_name"></h3>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <!-- Enabled / Disabled badge -->
+                                    <span
+                                        class="badge"
+                                        :class="mod.is_enabled ? 'badge-green' : 'badge-red'"
+                                    >
+                                        <span
+                                            class="w-1.5 h-1.5 rounded-full mr-1"
+                                            :class="mod.is_enabled ? 'bg-[#23a559]' : 'bg-[#f23f43]'"
+                                        ></span>
+                                        <span x-text="mod.is_enabled ? 'Enabled' : 'Disabled'"></span>
+                                    </span>
+
+                                    <!-- Core badge -->
+                                    <span x-show="mod.is_core" class="badge badge-yellow">
+                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                        </svg>
+                                        Core
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Category badge -->
+                            <span
+                                class="badge badge-blurple flex-shrink-0 ml-2"
+                                x-text="mod.category"
+                            ></span>
                         </div>
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" x-text="module.category"></span>
+
+                        <!-- Description -->
+                        <p class="text-xs text-[#94a3b8] leading-relaxed mb-4" x-text="mod.description || 'No description available'"></p>
                     </div>
 
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-4" x-text="module.description || 'No description'"></p>
-
-                    <div class="flex items-center justify-between">
-                        <span x-show="module.is_core" class="text-xs text-gray-400">Core Module</span>
+                    <!-- Footer: toggle -->
+                    <div class="flex items-center justify-between pt-3 border-t border-white/[0.05]">
+                        <span
+                            class="text-xs font-medium"
+                            :class="mod.is_enabled ? 'text-[#23a559]' : 'text-[#64748b]'"
+                            x-text="mod.is_enabled ? 'Active' : 'Inactive'"
+                        ></span>
                         <div class="flex items-center gap-2">
-                            <svg x-show="loading === module.name" x-cloak class="animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24">
+                            <!-- Per-module loading spinner -->
+                            <svg
+                                x-show="loadingStates[mod.name]"
+                                x-cloak
+                                class="animate-spin h-4 w-4 text-[#5865f2]"
+                                fill="none" viewBox="0 0 24 24"
+                            >
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
+
+                            <!-- Toggle switch -->
                             <button
-                                @click="toggleModule(module)"
-                                :disabled="module.is_core || loading === module.name"
+                                @click="toggleModule(mod)"
+                                :disabled="mod.is_core || loadingStates[mod.name]"
                                 class="toggle"
-                                :class="module.is_enabled ? 'bg-discord-green' : 'bg-gray-300 dark:bg-gray-600'"
+                                :class="mod.is_enabled ? 'bg-[#23a559]' : 'bg-[#64748b]/40'"
                             >
-                                <span class="toggle-dot" :class="module.is_enabled ? 'translate-x-6' : 'translate-x-1'"></span>
+                                <span
+                                    class="toggle-dot"
+                                    :class="mod.is_enabled ? 'translate-x-6' : 'translate-x-1'"
+                                ></span>
                             </button>
                         </div>
                     </div>
@@ -62,21 +153,23 @@
             </template>
         </div>
 
-        <!-- Empty State -->
-        <div x-show="!loadingModules && modules.length === 0" class="card text-center py-10">
-            <svg class="w-10 h-10 mx-auto text-gray-300 dark:text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"/>
+        <!-- Empty state: no modules -->
+        <div x-show="!loading && modules.length === 0" class="card empty-state">
+            <svg class="text-[#64748b]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
             </svg>
-            <p class="text-sm text-gray-400">No modules found for this server.</p>
+            <p class="text-sm font-medium text-[#94a3b8]">No modules found</p>
+            <p class="text-xs text-[#64748b] mt-1">No modules are configured yet.</p>
         </div>
     </div>
 
-    <!-- No guild selected -->
-    <div x-show="!selectedGuild && !loadingGuilds" x-cloak class="card text-center py-10">
-        <svg class="w-10 h-10 mx-auto text-gray-300 dark:text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/>
+    <!-- Empty state: no guild selected -->
+    <div x-show="!selectedGuild && !loading" x-cloak class="card empty-state">
+        <svg class="text-[#64748b]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/>
         </svg>
-        <p class="text-sm text-gray-400">Select a server above to manage modules.</p>
+        <p class="text-sm font-medium text-[#94a3b8]">No server selected</p>
+        <p class="text-xs text-[#64748b] mt-1">Select a server above to view and manage its modules.</p>
     </div>
 </div>
 {% endblock %}
@@ -88,16 +181,15 @@ function modulesPage() {
         guilds: [],
         selectedGuild: '',
         modules: [],
-        loading: null,
-        loadingGuilds: true,
-        loadingModules: false,
+        loading: false,
+        loadingStates: {},
 
         async init() {
-            await this.fetchGuilds();
+            await this.loadGuilds();
         },
 
-        async fetchGuilds() {
-            this.loadingGuilds = true;
+        async loadGuilds() {
+            this.loading = true;
             try {
                 const res = await Auth.fetch('/api/v1/guilds/');
                 if (res.ok) {
@@ -109,47 +201,60 @@ function modulesPage() {
             } catch (e) {
                 showToast('Failed to load servers', 'error');
             } finally {
-                this.loadingGuilds = false;
+                this.loading = false;
             }
         },
 
         async fetchModules() {
-            if (!this.selectedGuild) { this.modules = []; return; }
-            this.loadingModules = true;
+            if (!this.selectedGuild) {
+                this.modules = [];
+                return;
+            }
+            this.loading = true;
             try {
-                const response = await Auth.fetch('/api/v1/bot/modules');
-                if (response.ok) {
-                    const data = await response.json();
-                    this.modules = data.modules;
+                const res = await Auth.fetch('/api/v1/bot/modules');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.modules = data.modules || [];
+                } else {
+                    showToast('Failed to load modules', 'error');
                 }
-            } catch (error) {
-                console.error('Failed to fetch modules:', error);
+            } catch (e) {
+                showToast('Failed to load modules', 'error');
             } finally {
-                this.loadingModules = false;
+                this.loading = false;
             }
         },
 
         async toggleModule(module) {
-            this.loading = module.name;
+            this.loadingStates[module.name] = true;
             try {
-                const endpoint = module.is_enabled ? '/api/v1/bot/module/disable' : '/api/v1/bot/module/enable';
-                const response = await Auth.fetch(endpoint, {
+                const endpoint = module.is_enabled
+                    ? '/api/v1/bot/module/disable'
+                    : '/api/v1/bot/module/enable';
+                const res = await Auth.fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ module_name: module.name, guild_id: this.selectedGuild })
+                    body: JSON.stringify({
+                        module_name: module.name,
+                        guild_id: this.selectedGuild
+                    })
                 });
 
-                if (response.ok) {
+                if (res.ok) {
                     module.is_enabled = !module.is_enabled;
-                    showToast(`${module.display_name} ${module.is_enabled ? 'enabled' : 'disabled'}`, 'success');
+                    showToast(
+                        `${module.display_name} ${module.is_enabled ? 'enabled' : 'disabled'}`,
+                        'success'
+                    );
                 } else {
-                    const error = await response.json();
+                    const error = await res.json();
                     showToast(error.detail || 'Failed to toggle module', 'error');
                 }
-            } catch (error) {
+            } catch (e) {
                 showToast('Failed to toggle module', 'error');
             } finally {
-                this.loading = null;
+                delete this.loadingStates[module.name];
             }
         }
     };

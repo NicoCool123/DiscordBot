@@ -1,111 +1,188 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full" x-data="{ darkMode: localStorage.getItem('darkMode') === 'true', sidebarOpen: false }" :class="{ 'dark': darkMode }">
+<html lang="en" class="h-full dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Dashboard{% endblock %} - Discord Bot</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%235865f2' rx='20' width='100' height='100'/><text x='50' y='68' text-anchor='middle' fill='white' font-size='50' font-family='sans-serif' font-weight='bold'>B</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        base: '#0f0f23',
+                        card: '#1a1a2e',
+                        elevated: '#16213e',
+                        blurple: { DEFAULT: '#5865f2', dark: '#4752c4' },
+                        success: '#23a559',
+                        warning: '#f0b232',
+                        danger: '#f23f43',
+                        fuchsia: '#eb459e',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                    },
+                }
+            }
+        }
     </script>
-    <link rel="stylesheet" href="/static/css/main.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <link rel="stylesheet" href="/static/css/input.css">
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js" defer></script>
     {% block head %}{% endblock %}
 </head>
-<body class="h-full">
+<body class="h-full bg-base text-[#e2e8f0] font-sans" x-data="appShell()">
+
+    <!-- Toast Container -->
+    <div class="fixed bottom-4 right-4 z-[100] flex flex-col-reverse gap-2"
+         @toast.window="$store.toasts.add($event.detail)">
+        <template x-for="toast in $store.toasts.list" :key="toast.id">
+            <div class="flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border max-w-sm toast-enter text-sm font-medium"
+                 :class="{
+                     'bg-[#23a559]/20 text-[#4ade80] border-[#23a559]/20': toast.type === 'success',
+                     'bg-[#f23f43]/20 text-[#f87171] border-[#f23f43]/20': toast.type === 'error',
+                     'bg-[#f0b232]/20 text-[#fbbf24] border-[#f0b232]/20': toast.type === 'warning',
+                     'bg-[#5865f2]/20 text-[#818cf8] border-[#5865f2]/20': toast.type === 'info' || !toast.type,
+                 }">
+                <template x-if="toast.type === 'success'">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                </template>
+                <template x-if="toast.type === 'error'">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </template>
+                <template x-if="toast.type === 'warning'">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                </template>
+                <template x-if="toast.type === 'info' || !toast.type">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </template>
+                <span x-text="toast.message"></span>
+            </div>
+        </template>
+    </div>
+
     <div class="flex h-full">
         <!-- Mobile sidebar overlay -->
-        <div
-            x-show="sidebarOpen"
-            x-cloak
-            @click="sidebarOpen = false"
-            class="fixed inset-0 z-40 bg-black/50 lg:hidden"
-            x-transition:enter="transition-opacity duration-200"
-            x-transition:enter-start="opacity-0"
-            x-transition:enter-end="opacity-100"
-            x-transition:leave="transition-opacity duration-200"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
-        ></div>
+        <div x-show="sidebarOpen" x-cloak @click="sidebarOpen = false"
+             class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+             x-transition:enter="transition-opacity duration-200"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition-opacity duration-200"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"></div>
 
         <!-- Sidebar -->
-        <aside
-            class="fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-discord-darker border-r border-gray-200 dark:border-gray-700/50 transform transition-transform duration-200 lg:translate-x-0 lg:static flex flex-col"
-            :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
-        >
+        <aside class="fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-white/[0.06] transform transition-transform duration-300 ease-out lg:translate-x-0 lg:static flex flex-col"
+               :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
+
             <!-- Logo -->
-            <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-200 dark:border-gray-700/50">
-                <div class="w-9 h-9 bg-discord-blurple rounded-lg flex items-center justify-center flex-shrink-0">
+            <div class="flex items-center gap-3 px-5 py-5 border-b border-white/[0.06]">
+                <div class="w-10 h-10 bg-gradient-to-br from-blurple to-fuchsia rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-blurple/20">
                     <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/>
                     </svg>
                 </div>
                 <div>
-                    <h1 class="font-semibold text-base text-gray-900 dark:text-white">Bot Dashboard</h1>
-                    <p class="text-xs text-gray-400">v1.0.0</p>
+                    <h1 class="font-bold text-base text-white">Bot Dashboard</h1>
+                    <p class="text-[11px] text-[#64748b] font-medium">v1.0.0</p>
                 </div>
             </div>
 
             <!-- Navigation -->
-            <nav class="flex-1 p-3 space-y-0.5 overflow-y-auto">
-                <p class="px-3 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Main</p>
-                <a href="/dashboard" @click="sidebarOpen = false" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">
-                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+            <nav class="flex-1 p-3 space-y-1 overflow-y-auto scrollbar-thin">
+                <!-- Main -->
+                <p class="sidebar-section-title pt-2 pb-1.5">Main</p>
+                <a href="/dashboard" @click="sidebarOpen = false"
+                   class="sidebar-link {% if active_page == 'dashboard' %}sidebar-link-active{% endif %}">
+                    <svg class="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
                     </svg>
                     <span>Dashboard</span>
                 </a>
-                <a href="/commands" @click="sidebarOpen = false" class="nav-link {% if active_page == 'commands' %}active{% endif %}">
-                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                <a href="/commands" @click="sidebarOpen = false"
+                   class="sidebar-link {% if active_page == 'commands' %}sidebar-link-active{% endif %}">
+                    <svg class="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                     </svg>
                     <span>Commands</span>
                 </a>
-                <a href="/modules" @click="sidebarOpen = false" class="nav-link {% if active_page == 'modules' %}active{% endif %}">
-                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+                <a href="/modules" @click="sidebarOpen = false"
+                   class="sidebar-link {% if active_page == 'modules' %}sidebar-link-active{% endif %}">
+                    <svg class="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
                     </svg>
                     <span>Modules</span>
                 </a>
 
-                <p class="px-3 pt-4 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Configuration</p>
-                <a href="/settings" @click="sidebarOpen = false" class="nav-link {% if active_page == 'settings' %}active{% endif %}">
-                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <!-- Configuration -->
+                <p class="sidebar-section-title pt-5 pb-1.5">Configuration</p>
+                <a href="/settings" @click="sidebarOpen = false"
+                   class="sidebar-link {% if active_page == 'settings' %}sidebar-link-active{% endif %}">
+                    <svg class="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                     </svg>
                     <span>Settings</span>
                 </a>
 
-                <p class="px-3 pt-4 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Monitoring</p>
-                <a href="/logs" @click="sidebarOpen = false" class="nav-link {% if active_page == 'logs' %}active{% endif %}">
-                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                <!-- Gaming -->
+                <p class="sidebar-section-title pt-5 pb-1.5">Gaming</p>
+                <a href="/minecraft" @click="sidebarOpen = false"
+                   class="sidebar-link {% if active_page == 'minecraft' %}sidebar-link-active{% endif %}">
+                    <svg class="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                    </svg>
+                    <span>Minecraft</span>
+                </a>
+
+                <!-- Monitoring -->
+                <p class="sidebar-section-title pt-5 pb-1.5">Monitoring</p>
+                <a href="/logs" @click="sidebarOpen = false"
+                   class="sidebar-link {% if active_page == 'logs' %}sidebar-link-active{% endif %}">
+                    <svg class="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
                     <span>Live Logs</span>
                 </a>
-                <a href="/metrics" @click="sidebarOpen = false" class="nav-link {% if active_page == 'metrics' %}active{% endif %}">
-                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                <a href="/metrics" @click="sidebarOpen = false"
+                   class="sidebar-link {% if active_page == 'metrics' %}sidebar-link-active{% endif %}">
+                    <svg class="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                     </svg>
                     <span>Metrics</span>
                 </a>
+
+                <!-- Admin -->
+                <template x-if="user.is_superuser">
+                    <div>
+                        <p class="sidebar-section-title pt-5 pb-1.5">Admin</p>
+                        <a href="/users" @click="sidebarOpen = false"
+                           class="sidebar-link {% if active_page == 'users' %}sidebar-link-active{% endif %}">
+                            <svg class="w-[18px] h-[18px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                            </svg>
+                            <span>Users</span>
+                        </a>
+                    </div>
+                </template>
             </nav>
 
             <!-- User section -->
-            <div class="p-3 border-t border-gray-200 dark:border-gray-700/50" x-data="userInfo()" x-init="fetchUser()">
-                <div class="flex items-center justify-between px-2 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-discord-dark transition-colors">
+            <div class="p-3 border-t border-white/[0.06]">
+                <div class="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/[0.03]">
                     <div class="flex items-center gap-2.5 min-w-0">
-                        <div class="w-8 h-8 bg-discord-blurple rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
-                            <span x-text="initial"></span>
+                        <div class="w-8 h-8 bg-gradient-to-br from-blurple to-fuchsia rounded-lg flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                            <span x-text="user.initial"></span>
                         </div>
                         <div class="min-w-0">
-                            <p class="text-sm font-medium truncate" x-text="username"></p>
-                            <p class="text-xs text-gray-400 truncate" x-text="email"></p>
+                            <p class="text-sm font-semibold truncate text-white" x-text="user.username"></p>
+                            <p class="text-[11px] text-[#64748b] truncate" x-text="user.email"></p>
                         </div>
                     </div>
-                    <button @click="logout()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0 p-1" title="Logout">
+                    <button @click="logout()" class="text-[#64748b] hover:text-[#f23f43] flex-shrink-0 p-1.5 rounded-lg hover:bg-[#f23f43]/10 transition-all duration-200" title="Logout">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                         </svg>
@@ -117,41 +194,28 @@
         <!-- Main content -->
         <main class="flex-1 overflow-auto lg:ml-0">
             <!-- Top bar -->
-            <header class="sticky top-0 z-30 bg-white/80 dark:bg-discord-darker/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700/50">
+            <header class="sticky top-0 z-30 bg-base/80 backdrop-blur-xl border-b border-white/[0.06]">
                 <div class="flex items-center justify-between px-4 sm:px-6 py-3">
                     <div class="flex items-center gap-3">
-                        <button @click="sidebarOpen = !sidebarOpen" class="lg:hidden text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 p-1">
+                        <button @click="sidebarOpen = !sidebarOpen" class="lg:hidden text-[#94a3b8] hover:text-white p-1.5 rounded-lg hover:bg-white/5 transition-colors">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
                             </svg>
                         </button>
-                        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{% block page_title %}Dashboard{% endblock %}</h2>
+                        <h2 class="text-lg font-bold text-white">{% block page_title %}Dashboard{% endblock %}</h2>
                     </div>
                     <div class="flex items-center gap-3">
-                        <!-- Dark mode toggle -->
-                        <button
-                            @click="darkMode = !darkMode; localStorage.setItem('darkMode', darkMode); document.documentElement.classList.toggle('dark', darkMode)"
-                            class="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-discord-dark transition-colors"
-                            title="Toggle dark mode"
-                        >
-                            <svg x-show="!darkMode" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-                            </svg>
-                            <svg x-show="darkMode" x-cloak class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
-                            </svg>
-                        </button>
-                        <!-- Bot status indicator -->
-                        <div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-discord-dark" id="bot-status">
-                            <span class="w-2 h-2 rounded-full bg-gray-400 animate-pulse" id="status-indicator"></span>
-                            <span class="text-xs font-medium text-gray-500 dark:text-gray-400" id="status-text">Checking...</span>
+                        <!-- Bot status -->
+                        <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+                            <span class="w-2 h-2 rounded-full bg-[#64748b]" id="status-indicator" style="animation: pulse 2s infinite;"></span>
+                            <span class="text-xs font-medium text-[#64748b]" id="status-text">Checking...</span>
                         </div>
                     </div>
                 </div>
             </header>
 
             <!-- Page content -->
-            <div class="p-4 sm:p-6">
+            <div class="p-4 sm:p-6 animate-fadeIn">
                 {% block content %}{% endblock %}
             </div>
         </main>
@@ -162,28 +226,29 @@
     <script src="/static/js/websocket.js"></script>
     <script src="/static/js/app.js"></script>
     <script>
-        function userInfo() {
+        function appShell() {
             return {
-                username: 'Loading...',
-                email: '',
-                initial: '...',
-                async fetchUser() {
+                sidebarOpen: false,
+                user: { username: 'Loading...', email: '', initial: '...', is_superuser: false },
+
+                async init() {
                     try {
                         const res = await Auth.fetch('/api/v1/auth/me');
                         if (res.ok) {
                             const data = await res.json();
-                            this.username = data.display_name || data.username;
-                            this.email = data.email || '';
-                            this.initial = (data.username || 'U')[0].toUpperCase();
-                        } else {
-                            this.username = 'User';
-                            this.initial = 'U';
+                            this.user = {
+                                username: data.display_name || data.username,
+                                email: data.email || '',
+                                initial: (data.username || 'U')[0].toUpperCase(),
+                                is_superuser: data.is_superuser || false,
+                            };
                         }
                     } catch (e) {
-                        this.username = 'User';
-                        this.initial = 'U';
+                        this.user.username = 'User';
+                        this.user.initial = 'U';
                     }
                 },
+
                 logout() {
                     Auth.logout();
                 }

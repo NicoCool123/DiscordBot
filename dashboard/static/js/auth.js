@@ -1,4 +1,6 @@
 const Auth = {
+    _userCache: null,
+
     getToken() {
         return localStorage.getItem('access_token');
     },
@@ -34,6 +36,8 @@ const Auth = {
             const data = await response.json();
             localStorage.setItem('access_token', data.access_token);
             localStorage.setItem('refresh_token', data.refresh_token);
+            this._userCache = null;
+            window.dispatchEvent(new CustomEvent('auth:refreshed'));
             return true;
         } catch {
             this.logout();
@@ -52,10 +56,11 @@ const Auth = {
         } catch { /* ignore logout errors */ }
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
+        this._userCache = null;
+        window.dispatchEvent(new CustomEvent('auth:logout'));
         window.location.href = '/login';
     },
     async fetch(url, options = {}) {
-        // Ensure token is valid
         if (!this.isAuthenticated()) {
             const refreshed = await this.refreshToken();
             if (!refreshed) throw new Error('Authentication required');
@@ -72,13 +77,24 @@ const Auth = {
             this.logout();
         }
         return response;
+    },
+    async getUser() {
+        if (this._userCache) return this._userCache;
+        try {
+            const res = await this.fetch('/api/v1/auth/me');
+            if (res.ok) {
+                this._userCache = await res.json();
+                return this._userCache;
+            }
+        } catch { /* ignore */ }
+        return null;
     }
 };
 
 // Check auth on page load
 document.addEventListener('DOMContentLoaded', async () => {
-    if (!window.location.pathname.startsWith('/login') &&
-        !window.location.pathname.startsWith('/register')) {
+    const path = window.location.pathname;
+    if (!path.startsWith('/login') && !path.startsWith('/register') && path !== '/') {
         if (!Auth.isAuthenticated()) {
             const success = await Auth.refreshToken();
             if (!success) window.location.href = '/login';
