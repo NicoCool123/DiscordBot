@@ -1,3 +1,5 @@
+const API = "http://localhost:8000";
+
 const Auth = {
     _userCache: null,
 
@@ -24,7 +26,7 @@ const Auth = {
             return false;
         }
         try {
-            const response = await fetch('/api/v1/auth/refresh', {
+            const response = await fetch(`${API}/api/v1/auth/refresh`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ refresh_token: refreshToken }),
@@ -48,12 +50,12 @@ const Auth = {
         try {
             const token = this.getToken();
             if (token) {
-                await fetch('/api/v1/auth/logout', {
+                await fetch(`${API}/api/v1/auth/logout`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` },
                 });
             }
-        } catch { /* ignore logout errors */ }
+        } catch {}
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         this._userCache = null;
@@ -67,12 +69,12 @@ const Auth = {
         }
         const token = this.getToken();
         const headers = { ...options.headers, 'Authorization': `Bearer ${token}` };
-        const response = await fetch(url, { ...options, headers });
+        const response = await fetch(`${API}${url}`, { ...options, headers });
         if (response.status === 401) {
             const refreshed = await this.refreshToken();
             if (refreshed) {
                 headers['Authorization'] = `Bearer ${this.getToken()}`;
-                return fetch(url, { ...options, headers });
+                return fetch(`${API}${url}`, { ...options, headers });
             }
             this.logout();
         }
@@ -86,12 +88,11 @@ const Auth = {
                 this._userCache = await res.json();
                 return this._userCache;
             }
-        } catch { /* ignore */ }
+        } catch {}
         return null;
     }
 };
 
-// Check auth on page load
 document.addEventListener('DOMContentLoaded', async () => {
     const path = window.location.pathname;
     if (!path.startsWith('/login') && !path.startsWith('/register') && path !== '/') {

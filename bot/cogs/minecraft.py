@@ -1,5 +1,6 @@
 """Minecraft RCON Integration Cog."""
 
+import asyncio
 from typing import Optional
 
 import discord
@@ -72,7 +73,7 @@ class Minecraft(commands.Cog):
 
         try:
             # Get player list
-            list_response = self._execute_rcon("list")
+            list_response = await asyncio.to_thread(self._execute_rcon, "list")
 
             # Parse player count (format: "There are X of Y players online: ...")
             parts = list_response.split(":")
@@ -82,10 +83,10 @@ class Minecraft(commands.Cog):
             tps_response = ""
             try:
                 # This command might not work on all server types
-                tps_response = self._execute_rcon("forge tps")
+                tps_response = await asyncio.to_thread(self._execute_rcon, "forge tps")
             except Exception:
                 try:
-                    tps_response = self._execute_rcon("tps")
+                    tps_response = await asyncio.to_thread(self._execute_rcon, "tps")
                 except Exception:
                     tps_response = "TPS command not available"
 
@@ -163,7 +164,7 @@ class Minecraft(commands.Cog):
         await ctx.defer()
 
         try:
-            response = self._execute_rcon("list")
+            response = await asyncio.to_thread(self._execute_rcon, "list")
 
             embed = discord.Embed(
                 title="Online Players",
@@ -209,7 +210,7 @@ class Minecraft(commands.Cog):
                 return
 
         try:
-            response = self._execute_rcon(cmd)
+            response = await asyncio.to_thread(self._execute_rcon, cmd)
 
             # Log command execution
             if self.bot.api:
@@ -272,12 +273,12 @@ class Minecraft(commands.Cog):
         await ctx.defer()
 
         # Sanitize message
-        safe_message = message.replace('"', '\\"').replace("\\", "\\\\")
+        safe_message = message.replace("\\", "\\\\").replace('"', '\\"')
 
         try:
             # Use tellraw for better formatting
             cmd = f'say [Discord] {ctx.author.name}: {safe_message}'
-            self._execute_rcon(cmd)
+            await asyncio.to_thread(self._execute_rcon, cmd)
 
             await ctx.respond(f"Message sent to Minecraft server.")
 
@@ -310,7 +311,7 @@ class Minecraft(commands.Cog):
         await ctx.defer(ephemeral=True)
 
         try:
-            response = self._execute_rcon(f"whitelist add {player}")
+            response = await asyncio.to_thread(self._execute_rcon, f"whitelist add {player}")
 
             embed = discord.Embed(
                 title="Whitelist Updated",
@@ -338,7 +339,7 @@ class Minecraft(commands.Cog):
         await ctx.defer(ephemeral=True)
 
         try:
-            response = self._execute_rcon(f"whitelist remove {player}")
+            response = await asyncio.to_thread(self._execute_rcon, f"whitelist remove {player}")
 
             embed = discord.Embed(
                 title="Whitelist Updated",
@@ -366,7 +367,7 @@ class Minecraft(commands.Cog):
             return
 
         try:
-            list_response = self._execute_rcon("list")
+            list_response = await asyncio.to_thread(self._execute_rcon, "list")
             online = True
         except Exception:
             online = False

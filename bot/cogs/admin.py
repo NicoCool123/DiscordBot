@@ -115,7 +115,7 @@ class Admin(commands.Cog):
     @discord.option(
         name="cog",
         description="Name of the cog to reload",
-        choices=["admin", "moderation", "minecraft"],
+        choices=["admin", "moderation", "minecraft", "custom_commands"],
     )
     async def reload(
         self,
@@ -171,7 +171,7 @@ class Admin(commands.Cog):
     @discord.option(
         name="cog",
         description="Name of the cog to load",
-        choices=["admin", "moderation", "minecraft"],
+        choices=["admin", "moderation", "minecraft", "custom_commands"],
     )
     async def load(
         self,

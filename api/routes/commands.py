@@ -9,7 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.database import get_db
 from api.core.rate_limiter import limit_api
-from api.core.security import get_current_active_user
+from api.core.security import get_api_key_or_user, get_current_active_user
+from api.models.audit_log import AuditActions, AuditLog
 from api.models.custom_command import CustomCommand
 from api.models.command_config import CommandConfig
 from api.models.user import User
@@ -20,6 +21,7 @@ from api.schemas.commands import (
     CustomCommandResponse,
     CustomCommandUpdate,
 )
+from api.websocket.status import broadcast_bot_event
 
 router = APIRouter()
 
@@ -71,11 +73,20 @@ async def verify_guild_access(user: User, guild_id: str) -> None:
 async def list_custom_commands(
     guild_id: str,
     request: Request,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    auth: Annotated[tuple, Depends(get_api_key_or_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict[str, Any]:
     """List all custom commands for a guild."""
-    await verify_guild_access(current_user, guild_id)
+    user, api_key, is_bot_key = auth
+
+    # Bot key: direct access. User: verify guild permissions.
+    if not is_bot_key:
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+            )
+        await verify_guild_access(user, guild_id)
 
     result = await db.execute(
         select(CustomCommand).where(CustomCommand.guild_id == guild_id)
@@ -127,6 +138,29 @@ async def create_custom_command(
     await db.commit()
     await db.refresh(cmd)
 
+    # Audit log
+    audit = AuditLog.create(
+        action=AuditActions.COMMAND_CREATE,
+        resource="custom_command",
+        resource_id=cmd.name,
+        user_id=current_user.id,
+        details={
+            "guild_id": guild_id,
+            "command_name": cmd.name,
+            "description": cmd.description,
+            "ephemeral": cmd.ephemeral,
+        },
+        ip_address=request.client.host if request.client else None,
+    )
+    db.add(audit)
+    await db.commit()
+
+    # WebSocket broadcast for live dashboard update
+    await broadcast_bot_event("command_created", {
+        "guild_id": guild_id,
+        "command": CustomCommandResponse.model_validate(cmd).model_dump(mode="json"),
+    })
+
     return CustomCommandResponse.model_validate(cmd)
 
 
@@ -155,12 +189,50 @@ async def update_custom_command(
             detail="Command not found",
         )
 
+    # Capture old values for audit trail
+    old_values = {
+        "name": cmd.name,
+        "description": cmd.description,
+        "response": cmd.response,
+        "ephemeral": cmd.ephemeral,
+        "enabled": cmd.enabled,
+    }
+
     update_data = command_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(cmd, field, value)
 
     await db.commit()
     await db.refresh(cmd)
+
+    # Build changes dict
+    changes = {}
+    for field, new_val in update_data.items():
+        old_val = old_values.get(field)
+        if old_val != new_val:
+            changes[field] = {"old": old_val, "new": new_val}
+
+    # Audit log
+    audit = AuditLog.create(
+        action=AuditActions.COMMAND_UPDATE,
+        resource="custom_command",
+        resource_id=cmd.name,
+        user_id=current_user.id,
+        details={
+            "guild_id": guild_id,
+            "command_name": cmd.name,
+            "changes": changes,
+        },
+        ip_address=request.client.host if request.client else None,
+    )
+    db.add(audit)
+    await db.commit()
+
+    # WebSocket broadcast
+    await broadcast_bot_event("command_updated", {
+        "guild_id": guild_id,
+        "command": CustomCommandResponse.model_validate(cmd).model_dump(mode="json"),
+    })
 
     return CustomCommandResponse.model_validate(cmd)
 
@@ -189,8 +261,31 @@ async def delete_custom_command(
             detail="Command not found",
         )
 
+    command_name = cmd.name  # Capture before delete
     await db.delete(cmd)
     await db.commit()
+
+    # Audit log
+    audit = AuditLog.create(
+        action=AuditActions.COMMAND_DELETE,
+        resource="custom_command",
+        resource_id=command_name,
+        user_id=current_user.id,
+        details={
+            "guild_id": guild_id,
+            "command_name": command_name,
+        },
+        ip_address=request.client.host if request.client else None,
+    )
+    db.add(audit)
+    await db.commit()
+
+    # WebSocket broadcast
+    await broadcast_bot_event("command_deleted", {
+        "guild_id": guild_id,
+        "command_id": command_id,
+        "command_name": command_name,
+    })
 
     return {"status": "ok", "deleted": command_id}
 

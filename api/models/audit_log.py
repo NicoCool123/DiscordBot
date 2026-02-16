@@ -102,6 +102,12 @@ class AuditActions:
     # Minecraft actions
     MINECRAFT_COMMAND = "minecraft.command"
 
+    # Command actions
+    COMMAND_CREATE = "command.create"
+    COMMAND_UPDATE = "command.update"
+    COMMAND_DELETE = "command.delete"
+    COMMAND_EXECUTE = "command.execute"
+
     # API actions
     API_KEY_CREATE = "api_key.create"
     API_KEY_REVOKE = "api_key.revoke"

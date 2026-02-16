@@ -34,7 +34,7 @@
             x-show="guilds.length > 0"
             x-cloak
             x-model="selectedGuild"
-            @change="loadCustomCommands(); loadBuiltinCommands()"
+            @change="loadCustomCommands(); loadBuiltinCommands(); loadRecentActivity()"
             class="input-field max-w-md"
         >
             <option value="">-- Select a server --</option>
@@ -343,6 +343,72 @@
         </div>
     </div>
 
+    <!-- ==================== Recent Activity Section ==================== -->
+    <div x-show="selectedGuild" x-cloak class="card-static p-5">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-9 h-9 rounded-xl bg-[#eb459e]/10 flex items-center justify-center flex-shrink-0">
+                <svg class="w-[18px] h-[18px] text-[#eb459e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-sm font-semibold text-white">Recent Activity</h3>
+                <p class="text-xs text-[#64748b]">Latest command changes and usage</p>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div x-show="loadingStates._activity" class="flex items-center justify-center gap-2 py-6 text-sm text-[#94a3b8]">
+            <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Loading activity...</span>
+        </div>
+
+        <!-- Empty -->
+        <div x-show="!loadingStates._activity && recentActivity.length === 0" x-cloak class="text-center py-6">
+            <p class="text-sm text-[#64748b]">No recent command activity</p>
+        </div>
+
+        <!-- Activity list -->
+        <div x-show="!loadingStates._activity && recentActivity.length > 0" x-cloak class="space-y-2">
+            <template x-for="item in recentActivity" :key="item.id">
+                <div class="flex items-center gap-3 p-3 rounded-xl bg-[#0f0f23]/50 border border-white/[0.04]">
+                    <!-- Icon based on action -->
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                         :class="{
+                             'bg-[#23a559]/10': item.action === 'command.create',
+                             'bg-[#5865f2]/10': item.action === 'command.update',
+                             'bg-[#f23f43]/10': item.action === 'command.delete',
+                             'bg-[#f0b232]/10': item.action === 'command.execute',
+                         }">
+                        <template x-if="item.action === 'command.create'">
+                            <svg class="w-4 h-4 text-[#23a559]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        </template>
+                        <template x-if="item.action === 'command.update'">
+                            <svg class="w-4 h-4 text-[#5865f2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        </template>
+                        <template x-if="item.action === 'command.delete'">
+                            <svg class="w-4 h-4 text-[#f23f43]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </template>
+                        <template x-if="item.action === 'command.execute'">
+                            <svg class="w-4 h-4 text-[#f0b232]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        </template>
+                    </div>
+                    <!-- Details -->
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm text-[#e2e8f0]">
+                            <span x-text="item.action.replace('command.', '').charAt(0).toUpperCase() + item.action.replace('command.', '').slice(1) + 'd'"></span>
+                            <span class="text-[#5865f2] font-mono" x-text="'/' + (item.details?.command_name || item.resource_id || '')"></span>
+                        </p>
+                        <p class="text-[11px] text-[#64748b]" x-text="new Date(item.created_at).toLocaleString()"></p>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
     <!-- ==================== No Guild Selected Empty State ==================== -->
     <div x-show="!selectedGuild" x-cloak class="card-static empty-state py-16">
         <div class="w-16 h-16 mb-5 rounded-2xl bg-gradient-to-br from-[#5865f2]/10 to-[#eb459e]/10 flex items-center justify-center">
@@ -365,11 +431,33 @@ function commandsPage() {
         activeTab: 'custom',
         customCommands: [],
         builtinCommands: [],
+        recentActivity: [],
         newCommand: { name: '', description: '', response: '', ephemeral: false },
         loadingStates: {},
 
         async init() {
             await this.loadGuilds();
+            this._connectWebSocket();
+        },
+
+        _connectWebSocket() {
+            window.wsManager.connect('status', {
+                onMessage: (msg) => {
+                    if (msg.type === 'event' && this.selectedGuild) {
+                        const evtType = msg.event_type;
+                        const data = msg.data || {};
+                        if (data.guild_id === this.selectedGuild) {
+                            if (evtType === 'command_created' || evtType === 'command_updated' || evtType === 'command_deleted') {
+                                this.loadCustomCommands();
+                                this.loadRecentActivity();
+                                const action = evtType.replace('command_', '');
+                                const name = data.command?.name || data.command_name || '';
+                                showToast(`Command /${name} ${action}`, 'info');
+                            }
+                        }
+                    }
+                }
+            });
         },
 
         async loadGuilds() {
@@ -422,6 +510,25 @@ function commandsPage() {
             }
         },
 
+        async loadRecentActivity() {
+            if (!this.selectedGuild) { this.recentActivity = []; return; }
+            this.loadingStates._activity = true;
+            try {
+                const res = await Auth.fetch('/api/v1/dashboard/logs?resource=custom_command&per_page=20');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.recentActivity = (data.logs || []).filter(
+                        log => (log.details?.guild_id === this.selectedGuild)
+                            || (log.discord_guild_id === this.selectedGuild)
+                    ).slice(0, 10);
+                }
+            } catch (e) {
+                console.warn('Failed to load activity', e);
+            } finally {
+                this.loadingStates._activity = false;
+            }
+        },
+
         async addCommand() {
             if (!/^[a-zA-Z0-9_-]+$/.test(this.newCommand.name)) {
                 showToast('Command name can only contain letters, numbers, hyphens and underscores', 'error');
@@ -440,6 +547,7 @@ function commandsPage() {
                 showToast(`Command /${this.newCommand.name} created!`, 'success');
                 this.newCommand = { name: '', description: '', response: '', ephemeral: false };
                 await this.loadCustomCommands();
+                await this.loadRecentActivity();
             } catch (e) {
                 showToast(e.message, 'error');
             } finally {
@@ -458,6 +566,7 @@ function commandsPage() {
                 if (res.ok) {
                     cmd.enabled = !cmd.enabled;
                     showToast(`Command /${cmd.name} ${cmd.enabled ? 'enabled' : 'disabled'}`, 'success');
+                    await this.loadRecentActivity();
                 } else {
                     showToast('Failed to toggle command', 'error');
                 }
@@ -499,6 +608,7 @@ function commandsPage() {
                 if (res.ok) {
                     showToast(`Command /${cmd.name} deleted`, 'success');
                     this.customCommands = this.customCommands.filter(c => c.id !== cmd.id);
+                    await this.loadRecentActivity();
                 } else {
                     showToast('Failed to delete command', 'error');
                 }

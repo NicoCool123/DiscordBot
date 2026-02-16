@@ -31,6 +31,29 @@ class CustomCommands(commands.Cog):
     def cog_unload(self) -> None:
         self.refresh_commands.cancel()
 
+    async def _log_command_execution(
+        self,
+        command_name: str,
+        command_id,
+        interaction: discord.Interaction,
+    ) -> None:
+        """Log command execution to the API audit log (fire and forget)."""
+        try:
+            await self.bot.api.create_audit_log(
+                action="command.execute",
+                resource="custom_command",
+                user_id=interaction.user.id,
+                guild_id=interaction.guild.id if interaction.guild else None,
+                details={
+                    "command_name": command_name,
+                    "command_id": command_id,
+                    "channel_id": str(interaction.channel.id) if interaction.channel else None,
+                    "user_name": str(interaction.user),
+                },
+            )
+        except Exception as e:
+            logger.debug(f"Failed to log command execution for /{command_name}: {e}")
+
     @tasks.loop(minutes=2)
     async def refresh_commands(self) -> None:
         """Periodically refresh custom commands from API."""
@@ -55,7 +78,9 @@ class CustomCommands(commands.Cog):
         for cmd_data in commands_list:
             if not cmd_data.get("enabled", True):
                 continue
-            name = cmd_data["name"]
+            name = cmd_data.get("name")
+            if not name or not cmd_data.get("response"):
+                continue
             new_cache[name] = cmd_data
 
         # Unregister removed commands
@@ -81,7 +106,7 @@ class CustomCommands(commands.Cog):
                 self.bot.tree.remove_command(name, guild=guild)
 
             # Create new command
-            response_text = cmd_data["response"]
+            response_text = cmd_data.get("response", "")
             ephemeral = cmd_data.get("ephemeral", False)
             description = cmd_data.get("description", "Custom command")
 
@@ -90,12 +115,22 @@ class CustomCommands(commands.Cog):
                 interaction: discord.Interaction,
                 _response=response_text,
                 _ephemeral=ephemeral,
+                _name=name,
+                _cmd_id=cmd_data.get("id"),
             ):
                 # Simple template substitution
                 text = _response.replace("{user}", interaction.user.display_name)
                 text = text.replace("{server}", interaction.guild.name if interaction.guild else "DM")
                 text = text.replace("{channel}", interaction.channel.name if hasattr(interaction.channel, "name") else "DM")
                 await interaction.response.send_message(text, ephemeral=_ephemeral)
+
+                # Fire-and-forget execution logging
+                if self.bot.api:
+                    asyncio.create_task(self._log_command_execution(
+                        command_name=_name,
+                        command_id=_cmd_id,
+                        interaction=interaction,
+                    ))
 
             self.bot.tree.add_command(custom_callback, guild=guild)
             self._registered_commands[key] = custom_callback

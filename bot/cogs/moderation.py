@@ -6,7 +6,6 @@ from typing import Optional
 import discord
 from discord.ext import commands, tasks
 from discord.commands import SlashCommandGroup, option
-from discord.ext import commands
 
 from bot.services.logger import get_logger
 
@@ -176,6 +175,13 @@ class Moderation(commands.Cog):
         if member.top_role >= ctx.author.top_role:
             await ctx.respond(
                 "You cannot kick someone with an equal or higher role.",
+                ephemeral=True,
+            )
+            return
+
+        if member.top_role >= ctx.guild.me.top_role:
+            await ctx.respond(
+                "I cannot kick someone with an equal or higher role than me.",
                 ephemeral=True,
             )
             return

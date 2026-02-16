@@ -72,10 +72,19 @@ async def get_api_key_or_user(
 
     # Prüfe API Key Header
     if api_key:
-        result = await db.execute(select(APIKey).where(APIKey.key == api_key))
-        api_key_obj = result.scalar_one_or_none()
-        if api_key_obj and api_key_obj.is_bot:
+        # Check if it's the bot API key (shared secret from env)
+        if api_key == settings.bot_api_key:
             bot_key = True
+        else:
+            # Look up in database API keys by prefix, verify with bcrypt
+            key_prefix = api_key[:8] if len(api_key) >= 8 else api_key
+            result = await db.execute(
+                select(APIKey).where(APIKey.key_prefix == key_prefix)
+            )
+            for candidate in result.scalars().all():
+                if bcrypt.checkpw(api_key.encode("utf-8"), candidate.key_hash.encode("utf-8")):
+                    api_key_obj = candidate
+                    break
 
     # Prüfe Bearer Token
     if credentials and not bot_key:

@@ -213,6 +213,10 @@ def _format_activity_description(log: AuditLog) -> str:
         "module.enable": f"Module '{log.resource_id}' enabled",
         "module.disable": f"Module '{log.resource_id}' disabled",
         "minecraft.command": "Minecraft command executed",
+        "command.create": f"Custom command '/{log.resource_id}' created",
+        "command.update": f"Custom command '/{log.resource_id}' updated",
+        "command.delete": f"Custom command '/{log.resource_id}' deleted",
+        "command.execute": f"Custom command '/{log.resource_id}' used",
         "api_key.create": "API key created",
         "api_key.revoke": "API key revoked",
     }
