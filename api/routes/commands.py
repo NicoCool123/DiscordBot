@@ -32,76 +32,43 @@ MANAGE_GUILD = 0x20
 
 # Cache guild access results to avoid hammering Discord API on parallel requests
 # Key: (user_id, guild_id) -> (timestamp, has_access)
-_guild_access_cache: dict[tuple[int, str], tuple[float, bool]] = {}
-_GUILD_CACHE_TTL = 60  # seconds
+_user_guilds_cache: dict[int, tuple[float, list[dict]]] = {}
+_user_guilds_locks: dict[int, asyncio.Lock] = {}
+_USER_GUILDS_TTL = 300  # 5 Minuten
 # Lock per cache key to prevent parallel Discord API calls for the same user+guild
-_guild_access_locks: dict[tuple[int, str], asyncio.Lock] = {}
 
 
 async def verify_guild_access(user: User, guild_id: str) -> None:
-    """Verify the user has MANAGE_GUILD permission for the given guild."""
     if user.is_superuser:
         return
 
-    if not user.discord_access_token:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No Discord account linked",
-        )
+    guilds = await _get_user_guilds(user)
 
-    cache_key = (user.id, guild_id)
-
-    # Check cache first (avoids Discord API rate limits on parallel requests)
-    cached = _guild_access_cache.get(cache_key)
-    if cached and (time.time() - cached[0]) < _GUILD_CACHE_TTL:
-        if cached[1]:
-            return
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have permission to manage this guild",
-        )
-
-    # Use a lock so parallel requests for the same user+guild share one Discord call
-    if cache_key not in _guild_access_locks:
-        _guild_access_locks[cache_key] = asyncio.Lock()
-
-    async with _guild_access_locks[cache_key]:
-        # Re-check cache after acquiring lock (another request may have populated it)
-        cached = _guild_access_cache.get(cache_key)
-        if cached and (time.time() - cached[0]) < _GUILD_CACHE_TTL:
-            if cached[1]:
+    for guild in guilds:
+        if guild["id"] == guild_id:
+            perms = int(guild.get("permissions", 0))
+            if guild.get("owner") or (perms & MANAGE_GUILD):
                 return
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You don't have permission to manage this guild",
-            )
+            break
 
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{DISCORD_API_BASE}/users/@me/guilds",
-                headers={"Authorization": f"Bearer {user.discord_access_token}"},
-            )
-            if response.status_code != 200:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Failed to verify guild access",
-                )
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You don't have permission to manage this guild",
+    )
 
-            guilds = response.json()
-            for guild in guilds:
-                if guild["id"] == guild_id:
-                    perms = int(guild.get("permissions", 0))
-                    if guild.get("owner") or (perms & MANAGE_GUILD):
-                        _guild_access_cache[cache_key] = (time.time(), True)
-                        return
+async def verify_guild_member(user: User, guild_id: str) -> None:
+    if user.is_superuser:
+        return
 
-        _guild_access_cache[cache_key] = (time.time(), False)
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have permission to manage this guild",
-        )
+    guilds = await _get_user_guilds(user)
 
+    if any(g["id"] == guild_id for g in guilds):
+        return
 
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You are not a member of this guild",
+    )
 # =====================================================================
 # Custom Commands
 # =====================================================================
@@ -124,7 +91,7 @@ async def list_custom_commands(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Not authenticated",
             )
-        await verify_guild_access(user, guild_id)
+        await verify_guild_member(user, guild_id)
 
     result = await db.execute(
         select(CustomCommand).where(CustomCommand.guild_id == guild_id)
@@ -368,7 +335,7 @@ async def list_builtin_commands(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Not authenticated",
             )
-        await verify_guild_access(user, guild_id)
+        await verify_guild_member(user, guild_id)
 
     # Get all configs for this guild
     result = await db.execute(
@@ -458,7 +425,7 @@ async def get_command_activity(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Not authenticated",
             )
-        await verify_guild_access(user, guild_id)
+        await verify_guild_member(user, guild_id)
 
     result = await db.execute(
         select(AuditLog)
@@ -485,3 +452,68 @@ async def get_command_activity(
             break
 
     return {"activity": activity, "total": len(activity)}
+
+async def _get_user_guilds(user: User) -> list[dict]:
+    if not user.discord_access_token:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No Discord account linked",
+        )
+
+    # 1) Cache before lock
+    cached = _user_guilds_cache.get(user.id)
+    if cached and (time.time() - cached[0]) < _USER_GUILDS_TTL:
+        return cached[1]
+
+    # 2) Lock per user
+    lock = _user_guilds_locks.get(user.id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _user_guilds_locks[user.id] = lock
+
+    async with lock:
+        # 3) Cache again inside lock (critical)
+        cached = _user_guilds_cache.get(user.id)
+        if cached and (time.time() - cached[0]) < _USER_GUILDS_TTL:
+            return cached[1]
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # 4) Retry loop for 429
+            for _ in range(3):
+                resp = await client.get(
+                    f"{DISCORD_API_BASE}/users/@me/guilds",
+                    headers={"Authorization": f"Bearer {user.discord_access_token}"},
+                )
+
+                # Token invalid/expired
+                if resp.status_code in (401, 403):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Discord login expired. Reconnect Discord account.",
+                    )
+
+                # Rate limit
+                if resp.status_code == 429:
+                    try:
+                        data = resp.json()
+                        retry_after = float(data.get("retry_after", 1.0))
+                    except Exception:
+                        retry_after = 1.0
+                    await asyncio.sleep(retry_after)
+                    continue
+
+                if resp.status_code != 200:
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail="Discord API temporarily unavailable. Try again.",
+                    )
+
+                guilds = resp.json()
+                _user_guilds_cache[user.id] = (time.time(), guilds)
+                return guilds
+
+        # Wenn nach Retries immer noch 429:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Discord rate-limited. Try again in a moment.",
+        )
