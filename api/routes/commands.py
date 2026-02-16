@@ -1,5 +1,7 @@
 """Command management API routes (custom + built-in toggle)."""
 
+import asyncio
+import time
 from typing import Annotated, Any
 
 import httpx
@@ -28,6 +30,13 @@ router = APIRouter()
 DISCORD_API_BASE = "https://discord.com/api/v10"
 MANAGE_GUILD = 0x20
 
+# Cache guild access results to avoid hammering Discord API on parallel requests
+# Key: (user_id, guild_id) -> (timestamp, has_access)
+_guild_access_cache: dict[tuple[int, str], tuple[float, bool]] = {}
+_GUILD_CACHE_TTL = 60  # seconds
+# Lock per cache key to prevent parallel Discord API calls for the same user+guild
+_guild_access_locks: dict[tuple[int, str], asyncio.Lock] = {}
+
 
 async def verify_guild_access(user: User, guild_id: str) -> None:
     """Verify the user has MANAGE_GUILD permission for the given guild."""
@@ -40,28 +49,57 @@ async def verify_guild_access(user: User, guild_id: str) -> None:
             detail="No Discord account linked",
         )
 
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            f"{DISCORD_API_BASE}/users/@me/guilds",
-            headers={"Authorization": f"Bearer {user.discord_access_token}"},
+    cache_key = (user.id, guild_id)
+
+    # Check cache first (avoids Discord API rate limits on parallel requests)
+    cached = _guild_access_cache.get(cache_key)
+    if cached and (time.time() - cached[0]) < _GUILD_CACHE_TTL:
+        if cached[1]:
+            return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to manage this guild",
         )
-        if response.status_code != 200:
+
+    # Use a lock so parallel requests for the same user+guild share one Discord call
+    if cache_key not in _guild_access_locks:
+        _guild_access_locks[cache_key] = asyncio.Lock()
+
+    async with _guild_access_locks[cache_key]:
+        # Re-check cache after acquiring lock (another request may have populated it)
+        cached = _guild_access_cache.get(cache_key)
+        if cached and (time.time() - cached[0]) < _GUILD_CACHE_TTL:
+            if cached[1]:
+                return
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Failed to verify guild access",
+                detail="You don't have permission to manage this guild",
             )
 
-        guilds = response.json()
-        for guild in guilds:
-            if guild["id"] == guild_id:
-                perms = int(guild.get("permissions", 0))
-                if guild.get("owner") or (perms & MANAGE_GUILD):
-                    return
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{DISCORD_API_BASE}/users/@me/guilds",
+                headers={"Authorization": f"Bearer {user.discord_access_token}"},
+            )
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Failed to verify guild access",
+                )
 
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="You don't have permission to manage this guild",
-    )
+            guilds = response.json()
+            for guild in guilds:
+                if guild["id"] == guild_id:
+                    perms = int(guild.get("permissions", 0))
+                    if guild.get("owner") or (perms & MANAGE_GUILD):
+                        _guild_access_cache[cache_key] = (time.time(), True)
+                        return
+
+        _guild_access_cache[cache_key] = (time.time(), False)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to manage this guild",
+        )
 
 
 # =====================================================================
@@ -318,11 +356,19 @@ BUILTIN_COMMANDS: list[dict] = [
 async def list_builtin_commands(
     guild_id: str,
     request: Request,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    auth: Annotated[tuple, Depends(get_api_key_or_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict[str, Any]:
     """List all built-in commands with their enabled state for a guild."""
-    await verify_guild_access(current_user, guild_id)
+    user, api_key, is_bot_key = auth
+
+    if not is_bot_key:
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+            )
+        await verify_guild_access(user, guild_id)
 
     # Get all configs for this guild
     result = await db.execute(
@@ -389,3 +435,53 @@ async def toggle_builtin_command(
     await db.commit()
 
     return {"command_name": command_name, "enabled": config_data.enabled}
+
+
+# =====================================================================
+# Command Activity (no audit:read permission needed)
+# =====================================================================
+
+@router.get("/{guild_id}/activity")
+@limit_api()
+async def get_command_activity(
+    guild_id: str,
+    request: Request,
+    auth: Annotated[tuple, Depends(get_api_key_or_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, Any]:
+    """Get recent command activity for a guild (no audit:read perm needed)."""
+    user, api_key, is_bot_key = auth
+
+    if not is_bot_key:
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+            )
+        await verify_guild_access(user, guild_id)
+
+    result = await db.execute(
+        select(AuditLog)
+        .where(AuditLog.resource == "custom_command")
+        .order_by(AuditLog.created_at.desc())
+        .limit(20)
+    )
+    logs = result.scalars().all()
+
+    # Filter to this guild by checking details JSON
+    activity = []
+    for log in logs:
+        details = log.details or {}
+        log_guild = details.get("guild_id") or log.discord_guild_id
+        if log_guild == guild_id:
+            activity.append({
+                "id": log.id,
+                "action": log.action,
+                "resource_id": log.resource_id,
+                "details": details,
+                "created_at": log.created_at.isoformat(),
+            })
+        if len(activity) >= 10:
+            break
+
+    return {"activity": activity, "total": len(activity)}

@@ -482,6 +482,8 @@ function commandsPage() {
                 if (res.ok) {
                     const data = await res.json();
                     this.customCommands = data.commands || [];
+                } else if (res.status === 403) {
+                    console.warn('No permission to view commands for this guild');
                 } else {
                     showToast('Failed to load custom commands', 'error');
                 }
@@ -500,6 +502,8 @@ function commandsPage() {
                 if (res.ok) {
                     const data = await res.json();
                     this.builtinCommands = data.commands || [];
+                } else if (res.status === 403) {
+                    console.warn('No permission to view built-in commands for this guild');
                 } else {
                     showToast('Failed to load built-in commands', 'error');
                 }
@@ -514,13 +518,10 @@ function commandsPage() {
             if (!this.selectedGuild) { this.recentActivity = []; return; }
             this.loadingStates._activity = true;
             try {
-                const res = await Auth.fetch('/api/v1/dashboard/logs?resource=custom_command&per_page=20');
+                const res = await Auth.fetch(`/api/v1/commands/${this.selectedGuild}/activity`);
                 if (res.ok) {
                     const data = await res.json();
-                    this.recentActivity = (data.logs || []).filter(
-                        log => (log.details?.guild_id === this.selectedGuild)
-                            || (log.discord_guild_id === this.selectedGuild)
-                    ).slice(0, 10);
+                    this.recentActivity = data.activity || [];
                 }
             } catch (e) {
                 console.warn('Failed to load activity', e);

@@ -1,5 +1,12 @@
 const API = "http://localhost:8000";
 
+function decodeJwtPayload(token) {
+  const base64Url = token.split('.')[1];
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+    + '=='.slice(0, (4 - (base64Url.length % 4)) % 4);
+  return JSON.parse(atob(base64));
+}
+
 const Auth = {
     _userCache: null,
 
@@ -9,16 +16,16 @@ const Auth = {
     getRefreshToken() {
         return localStorage.getItem('refresh_token');
     },
-    isAuthenticated() {
-        const token = this.getToken();
-        if (!token) return false;
-        try {
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            return payload.exp * 1000 > Date.now();
-        } catch {
-            return false;
-        }
-    },
+isAuthenticated() {
+  const token = this.getToken();
+  if (!token) return false;
+  try {
+    const payload = decodeJwtPayload(token);
+    return payload.exp * 1000 > Date.now();
+  } catch {
+    return false;
+  }
+},
     async refreshToken() {
         const refreshToken = this.getRefreshToken();
         if (!refreshToken) {
@@ -63,23 +70,35 @@ const Auth = {
         window.location.href = '/login';
     },
     async fetch(url, options = {}) {
-        if (!this.isAuthenticated()) {
-            const refreshed = await this.refreshToken();
-            if (!refreshed) throw new Error('Authentication required');
-        }
-        const token = this.getToken();
-        const headers = { ...options.headers, 'Authorization': `Bearer ${token}` };
-        const response = await fetch(`${API}${url}`, { ...options, headers });
-        if (response.status === 401) {
-            const refreshed = await this.refreshToken();
-            if (refreshed) {
-                headers['Authorization'] = `Bearer ${this.getToken()}`;
-                return fetch(`${API}${url}`, { ...options, headers });
-            }
-            this.logout();
-        }
-        return response;
-    },
+  if (!this.isAuthenticated()) {
+    const refreshed = await this.refreshToken();
+    if (!refreshed) throw new Error('Authentication required');
+  }
+
+  const token = this.getToken();
+  const headers = { ...(options.headers || {}), Authorization: `Bearer ${token}` };
+
+  const res = await fetch(`${API}${url}`, { ...options, headers });
+
+  if (res.status === 401) {
+    const refreshed = await this.refreshToken();
+    if (refreshed) {
+      const retryHeaders = { ...(options.headers || {}), Authorization: `Bearer ${this.getToken()}` };
+      return fetch(`${API}${url}`, { ...options, headers: retryHeaders });
+    }
+    await this.logout();
+    throw new Error('Session expired');
+  }
+
+  // Optional: Debug für 403/405
+  if (res.status === 403 || res.status === 405) {
+    let detail = '';
+    try { detail = await res.clone().text(); } catch {}
+    console.warn(`API ${res.status} on ${url}:`, detail);
+  }
+
+  return res;
+},
     async getUser() {
         if (this._userCache) return this._userCache;
         try {
