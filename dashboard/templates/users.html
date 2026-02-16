@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block title %}Users{% endblock %}
+{% block page_title %}User Management{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="usersPage()">
+
+    <!-- Controls -->
+    <div class="card p-5 flex flex-wrap items-center gap-3">
+        <div class="flex-1 min-w-[200px]">
+            <input x-model="search" type="text" placeholder="Search users..."
+                   class="input-field text-sm w-full max-w-xs">
+        </div>
+        <span class="badge badge-blurple" x-text="`${filteredUsers.length} users`"></span>
+    </div>
+
+    <!-- Error -->
+    <div x-show="error" x-cloak class="card p-5 border border-[#f23f43]/20">
+        <p class="text-sm text-[#f87171]" x-text="error"></p>
+    </div>
+
+    <!-- Loading -->
+    <template x-if="loading">
+        <div class="card p-6 space-y-3">
+            <div class="skeleton h-10 w-full"></div>
+            <div class="skeleton h-10 w-full"></div>
+            <div class="skeleton h-10 w-full"></div>
+            <div class="skeleton h-10 w-full"></div>
+        </div>
+    </template>
+
+    <!-- Users Table -->
+    <template x-if="!loading">
+        <div class="card overflow-hidden">
+            <template x-if="filteredUsers.length === 0">
+                <div class="empty-state py-12">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                    <p class="text-sm" x-text="search ? 'No users match your search' : 'No users found'"></p>
+                </div>
+            </template>
+
+            <template x-if="filteredUsers.length > 0">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="table-header">
+                                <th class="text-left py-3 px-5">User</th>
+                                <th class="text-left py-3 px-4 hidden sm:table-cell">Email</th>
+                                <th class="text-left py-3 px-4 hidden md:table-cell">Roles</th>
+                                <th class="text-center py-3 px-4">Status</th>
+                                <th class="text-left py-3 px-4 hidden lg:table-cell">Last Login</th>
+                                <th class="text-right py-3 px-5">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="user in filteredUsers" :key="user.id">
+                                <tr class="table-row">
+                                    <td class="py-3 px-5">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#5865f2] to-[#eb459e] flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                                                 x-text="(user.username || 'U')[0].toUpperCase()"></div>
+                                            <div class="min-w-0">
+                                                <p class="font-medium text-white truncate" x-text="user.display_name || user.username"></p>
+                                                <p class="text-[11px] text-[#64748b] truncate" x-text="'@' + user.username"></p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-4 text-[#94a3b8] hidden sm:table-cell" x-text="user.email || '-'"></td>
+                                    <td class="py-3 px-4 hidden md:table-cell">
+                                        <div class="flex flex-wrap gap-1">
+                                            <template x-for="role in (user.roles || [])" :key="role.name || role">
+                                                <span class="badge badge-blurple" x-text="role.name || role"></span>
+                                            </template>
+                                            <span x-show="user.is_superuser" class="badge badge-yellow">Admin</span>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-4 text-center">
+                                        <span class="badge" :class="user.is_active ? 'badge-green' : 'badge-red'"
+                                              x-text="user.is_active ? 'Active' : 'Inactive'"></span>
+                                    </td>
+                                    <td class="py-3 px-4 text-[#64748b] text-xs hidden lg:table-cell"
+                                        x-text="user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'"></td>
+                                    <td class="py-3 px-5 text-right">
+                                        <div class="flex items-center justify-end gap-1">
+                                            <button @click="openEditModal(user)"
+                                                    class="p-1.5 rounded-lg text-[#94a3b8] hover:text-white hover:bg-white/5 transition-colors"
+                                                    title="Edit user">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                                </svg>
+                                            </button>
+                                            <button @click="toggleActive(user)"
+                                                    class="p-1.5 rounded-lg transition-colors"
+                                                    :class="user.is_active ? 'text-[#94a3b8] hover:text-[#f23f43] hover:bg-[#f23f43]/10' : 'text-[#94a3b8] hover:text-[#23a559] hover:bg-[#23a559]/10'"
+                                                    :title="user.is_active ? 'Deactivate' : 'Activate'">
+                                                <svg x-show="user.is_active" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                                </svg>
+                                                <svg x-show="!user.is_active" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </template>
+
+            <!-- Pagination -->
+            <div x-show="totalPages > 1" class="flex items-center justify-between px-5 py-3 border-t border-white/[0.05]">
+                <p class="text-xs text-[#64748b]" x-text="`Page ${page} of ${totalPages}`"></p>
+                <div class="flex gap-1">
+                    <button @click="goToPage(page - 1)" :disabled="page <= 1"
+                            class="btn btn-ghost text-xs py-1 px-2">Prev</button>
+                    <button @click="goToPage(page + 1)" :disabled="page >= totalPages"
+                            class="btn btn-ghost text-xs py-1 px-2">Next</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Edit Modal -->
+    <div x-show="editModalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div @click="editModalOpen = false" class="fixed inset-0 modal-overlay"></div>
+        <div class="card-static p-6 w-full max-w-md relative z-10" @click.stop>
+            <h3 class="text-base font-semibold text-white mb-5">Edit User</h3>
+            <template x-if="editUser">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-[#94a3b8] mb-1.5">Display Name</label>
+                        <input type="text" x-model="editUser.display_name" class="input-field">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-[#94a3b8] mb-1.5">Status</label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <button type="button" @click="editUser.is_active = !editUser.is_active"
+                                    class="toggle" :class="editUser.is_active ? 'bg-[#23a559]' : 'bg-white/10'">
+                                <span class="toggle-dot ml-0.5" :class="editUser.is_active ? 'translate-x-5' : 'translate-x-0'"></span>
+                            </button>
+                            <span class="text-sm text-[#e2e8f0]" x-text="editUser.is_active ? 'Active' : 'Inactive'"></span>
+                        </label>
+                    </div>
+                    <div class="flex gap-2 pt-2">
+                        <button @click="saveUser()" :disabled="saving" class="btn btn-primary flex-1">
+                            <span x-text="saving ? 'Saving...' : 'Save'"></span>
+                        </button>
+                        <button @click="editModalOpen = false" class="btn btn-ghost">Cancel</button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function usersPage() {
+    return {
+        users: [],
+        loading: true,
+        error: null,
+        search: '',
+        page: 1,
+        totalPages: 1,
+        editModalOpen: false,
+        editUser: null,
+        saving: false,
+
+        get filteredUsers() {
+            if (!this.search) return this.users;
+            const q = this.search.toLowerCase();
+            return this.users.filter(u =>
+                (u.username || '').toLowerCase().includes(q) ||
+                (u.email || '').toLowerCase().includes(q) ||
+                (u.display_name || '').toLowerCase().includes(q)
+            );
+        },
+
+        async init() {
+            await this.fetchUsers();
+        },
+
+        async fetchUsers() {
+            this.loading = true;
+            this.error = null;
+            try {
+                const res = await Auth.fetch(`/api/v1/users/?page=${this.page}&per_page=50`);
+                if (res.ok) {
+                    const data = await res.json();
+                    this.users = data.users || [];
+                    this.totalPages = data.pages || 1;
+                } else if (res.status === 403) {
+                    this.error = 'You do not have permission to view users';
+                } else {
+                    this.error = 'Failed to load users';
+                }
+            } catch (e) {
+                this.error = 'Failed to connect to API';
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async goToPage(p) {
+            if (p < 1 || p > this.totalPages) return;
+            this.page = p;
+            await this.fetchUsers();
+        },
+
+        openEditModal(user) {
+            this.editUser = { ...user };
+            this.editModalOpen = true;
+        },
+
+        async saveUser() {
+            if (!this.editUser) return;
+            this.saving = true;
+            try {
+                const res = await Auth.fetch(`/api/v1/users/${this.editUser.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        display_name: this.editUser.display_name,
+                        is_active: this.editUser.is_active,
+                    }),
+                });
+                if (res.ok) {
+                    const idx = this.users.findIndex(u => u.id === this.editUser.id);
+                    if (idx !== -1) {
+                        this.users[idx] = { ...this.users[idx], ...this.editUser };
+                    }
+                    this.editModalOpen = false;
+                    showToast('User updated successfully', 'success');
+                } else {
+                    const data = await res.json().catch(() => ({}));
+                    showToast(data.detail || 'Failed to update user', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to update user', 'error');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        async toggleActive(user) {
+            try {
+                const res = await Auth.fetch(`/api/v1/users/${user.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ is_active: !user.is_active }),
+                });
+                if (res.ok) {
+                    user.is_active = !user.is_active;
+                    showToast(`User ${user.username} ${user.is_active ? 'activated' : 'deactivated'}`, 'success');
+                } else {
+                    const data = await res.json().catch(() => ({}));
+                    showToast(data.detail || 'Failed to update user', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to update user', 'error');
+            }
+        }
+    };
+}
+</script>
+{% endblock %}
