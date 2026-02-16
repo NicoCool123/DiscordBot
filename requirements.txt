@@ -1,5 +1,5 @@
 # Discord Bot
-py-cord>=2.7.0
+discord.py>=2.4.0
 
 # FastAPI & Web
 fastapi>=0.109.0

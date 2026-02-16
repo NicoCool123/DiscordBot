@@ -82,6 +82,9 @@ class DiscordBot(commands.Bot):
         # Load all cogs
         await self._load_cogs()
 
+        # Set up app command error handler
+        self.tree.on_error = self.on_app_command_error
+
         logger.info("Bot setup complete")
 
     async def _load_cogs(self) -> None:
@@ -175,22 +178,34 @@ class DiscordBot(commands.Bot):
         logger.error(f"Command error in {ctx.command}: {error}", exc_info=error)
         await ctx.send("An unexpected error occurred. Please try again later.")
 
-    async def on_application_command_error(
-            self, interaction: discord.Interaction, error: discord.DiscordException
+    async def on_app_command_error(
+        self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError
     ) -> None:
         """Global error handler for slash commands."""
-        if isinstance(error, discord.errors.CheckFailure):
-            await interaction.response.send_message(
-                "You don't have permission to use this command.",
-                ephemeral=True,
-            )
+        if isinstance(error, discord.app_commands.CheckFailure):
+            if interaction.response.is_done():
+                await interaction.followup.send(
+                    "You don't have permission to use this command.",
+                    ephemeral=True,
+                )
+            else:
+                await interaction.response.send_message(
+                    "You don't have permission to use this command.",
+                    ephemeral=True,
+                )
             return
 
         logger.error(f"Slash command error: {error}", exc_info=error)
-        await interaction.response.send_message(
-            "An unexpected error occurred. Please try again later.",
-            ephemeral=True,
-        )
+        if interaction.response.is_done():
+            await interaction.followup.send(
+                "An unexpected error occurred. Please try again later.",
+                ephemeral=True,
+            )
+        else:
+            await interaction.response.send_message(
+                "An unexpected error occurred. Please try again later.",
+                ephemeral=True,
+            )
 
     async def close(self) -> None:
         """Clean up resources before shutdown."""

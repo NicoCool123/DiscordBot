@@ -6,8 +6,8 @@ from datetime import datetime
 from typing import Optional
 
 import discord
+from discord import app_commands
 from discord.ext import commands, tasks
-from discord.commands import SlashCommandGroup, option
 
 from bot.services.logger import get_logger
 
@@ -27,22 +27,27 @@ class Admin(commands.Cog):
         """Cleanup when cog is unloaded."""
         self.status_reporter.cancel()
 
-    async def cog_before_invoke(self, ctx) -> None:
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """Check if the command is enabled for this guild."""
-        if ctx.guild and self.bot.api:
-            cmd_name = ctx.command.qualified_name if hasattr(ctx.command, 'qualified_name') else str(ctx.command)
-            config = await self.bot.api.get_command_config(str(ctx.guild.id), cmd_name)
+        if interaction.guild and self.bot.api:
+            cmd_name = interaction.command.qualified_name if interaction.command else "unknown"
+            config = await self.bot.api.get_command_config(str(interaction.guild.id), cmd_name)
             if not config.get("enabled", True):
-                raise commands.CheckFailure(f"Command `{cmd_name}` is disabled in this server.")
+                await interaction.response.send_message(
+                    f"Command `{cmd_name}` is disabled in this server.",
+                    ephemeral=True,
+                )
+                return False
+        return True
 
     # -------------------------------------------------------------------------
     # Slash Command Group
     # -------------------------------------------------------------------------
 
-    admin = SlashCommandGroup(
+    admin = app_commands.Group(
         name="admin",
         description="Administrative commands",
-        default_member_permissions=discord.Permissions(administrator=True),
+        default_permissions=discord.Permissions(administrator=True),
     )
 
     # -------------------------------------------------------------------------
@@ -50,7 +55,7 @@ class Admin(commands.Cog):
     # -------------------------------------------------------------------------
 
     @admin.command(name="status", description="Show bot status and statistics")
-    async def status(self, ctx: discord.ApplicationContext) -> None:
+    async def status(self, interaction: discord.Interaction) -> None:
         """Display bot status information."""
         uptime = datetime.utcnow() - self.start_time
         uptime_str = str(uptime).split(".")[0]  # Remove microseconds
@@ -105,34 +110,36 @@ class Admin(commands.Cog):
 
         embed.set_footer(text=f"Platform: {platform.system()} {platform.release()}")
 
-        await ctx.respond(embed=embed)
+        await interaction.response.send_message(embed=embed)
 
     # -------------------------------------------------------------------------
     # Reload Command
     # -------------------------------------------------------------------------
 
     @admin.command(name="reload", description="Reload a bot cog")
-    @discord.option(
-        name="cog",
-        description="Name of the cog to reload",
-        choices=["admin", "moderation", "minecraft", "custom_commands"],
-    )
+    @app_commands.describe(cog="Name of the cog to reload")
+    @app_commands.choices(cog=[
+        app_commands.Choice(name="admin", value="admin"),
+        app_commands.Choice(name="moderation", value="moderation"),
+        app_commands.Choice(name="minecraft", value="minecraft"),
+        app_commands.Choice(name="custom_commands", value="custom_commands"),
+    ])
     async def reload(
         self,
-        ctx: discord.ApplicationContext,
-        cog: str,
+        interaction: discord.Interaction,
+        cog: app_commands.Choice[str],
     ) -> None:
         """Reload a specific cog."""
-        await ctx.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
 
-        cog_name = f"bot.cogs.{cog}"
+        cog_name = f"bot.cogs.{cog.value}"
 
         try:
             await self.bot.reload_extension(cog_name)
-            logger.info(f"Reloaded cog: {cog}", user_id=ctx.author.id)
+            logger.info(f"Reloaded cog: {cog.value}", user_id=interaction.user.id)
 
-            await ctx.respond(
-                f"Successfully reloaded `{cog}`",
+            await interaction.followup.send(
+                f"Successfully reloaded `{cog.value}`",
                 ephemeral=True,
             )
 
@@ -140,26 +147,26 @@ class Admin(commands.Cog):
             if self.bot.api:
                 await self.bot.api.create_audit_log(
                     action="reload_cog",
-                    resource=cog,
-                    user_id=ctx.author.id,
-                    guild_id=ctx.guild_id,
-                    details={"cog_name": cog},
+                    resource=cog.value,
+                    user_id=interaction.user.id,
+                    guild_id=interaction.guild_id,
+                    details={"cog_name": cog.value},
                 )
 
         except commands.ExtensionNotLoaded:
-            await ctx.respond(
-                f"Cog `{cog}` is not loaded. Use `/admin load` instead.",
+            await interaction.followup.send(
+                f"Cog `{cog.value}` is not loaded. Use `/admin load` instead.",
                 ephemeral=True,
             )
         except commands.ExtensionNotFound:
-            await ctx.respond(
-                f"Cog `{cog}` not found.",
+            await interaction.followup.send(
+                f"Cog `{cog.value}` not found.",
                 ephemeral=True,
             )
         except Exception as e:
-            logger.error(f"Failed to reload cog {cog}: {e}")
-            await ctx.respond(
-                f"Failed to reload `{cog}`: {e}",
+            logger.error(f"Failed to reload cog {cog.value}: {e}")
+            await interaction.followup.send(
+                f"Failed to reload `{cog.value}`: {e}",
                 ephemeral=True,
             )
 
@@ -168,97 +175,100 @@ class Admin(commands.Cog):
     # -------------------------------------------------------------------------
 
     @admin.command(name="load", description="Load a bot cog")
-    @discord.option(
-        name="cog",
-        description="Name of the cog to load",
-        choices=["admin", "moderation", "minecraft", "custom_commands"],
-    )
+    @app_commands.describe(cog="Name of the cog to load")
+    @app_commands.choices(cog=[
+        app_commands.Choice(name="admin", value="admin"),
+        app_commands.Choice(name="moderation", value="moderation"),
+        app_commands.Choice(name="minecraft", value="minecraft"),
+        app_commands.Choice(name="custom_commands", value="custom_commands"),
+    ])
     async def load(
         self,
-        ctx: discord.ApplicationContext,
-        cog: str,
+        interaction: discord.Interaction,
+        cog: app_commands.Choice[str],
     ) -> None:
         """Load a specific cog."""
-        await ctx.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
 
-        cog_name = f"bot.cogs.{cog}"
+        cog_name = f"bot.cogs.{cog.value}"
 
         try:
             await self.bot.load_extension(cog_name)
-            logger.info(f"Loaded cog: {cog}", user_id=ctx.author.id)
-            await ctx.respond(f"Successfully loaded `{cog}`", ephemeral=True)
+            logger.info(f"Loaded cog: {cog.value}", user_id=interaction.user.id)
+            await interaction.followup.send(f"Successfully loaded `{cog.value}`", ephemeral=True)
 
         except commands.ExtensionAlreadyLoaded:
-            await ctx.respond(f"Cog `{cog}` is already loaded.", ephemeral=True)
+            await interaction.followup.send(f"Cog `{cog.value}` is already loaded.", ephemeral=True)
         except Exception as e:
-            logger.error(f"Failed to load cog {cog}: {e}")
-            await ctx.respond(f"Failed to load `{cog}`: {e}", ephemeral=True)
+            logger.error(f"Failed to load cog {cog.value}: {e}")
+            await interaction.followup.send(f"Failed to load `{cog.value}`: {e}", ephemeral=True)
 
     @admin.command(name="unload", description="Unload a bot cog")
-    @discord.option(
-        name="cog",
-        description="Name of the cog to unload",
-        choices=["moderation", "minecraft"],  # Admin cog cannot be unloaded
-    )
+    @app_commands.describe(cog="Name of the cog to unload")
+    @app_commands.choices(cog=[
+        app_commands.Choice(name="moderation", value="moderation"),
+        app_commands.Choice(name="minecraft", value="minecraft"),
+    ])
     async def unload(
         self,
-        ctx: discord.ApplicationContext,
-        cog: str,
+        interaction: discord.Interaction,
+        cog: app_commands.Choice[str],
     ) -> None:
         """Unload a specific cog."""
-        await ctx.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
 
-        cog_name = f"bot.cogs.{cog}"
+        cog_name = f"bot.cogs.{cog.value}"
 
         try:
             await self.bot.unload_extension(cog_name)
-            logger.info(f"Unloaded cog: {cog}", user_id=ctx.author.id)
-            await ctx.respond(f"Successfully unloaded `{cog}`", ephemeral=True)
+            logger.info(f"Unloaded cog: {cog.value}", user_id=interaction.user.id)
+            await interaction.followup.send(f"Successfully unloaded `{cog.value}`", ephemeral=True)
 
         except commands.ExtensionNotLoaded:
-            await ctx.respond(f"Cog `{cog}` is not loaded.", ephemeral=True)
+            await interaction.followup.send(f"Cog `{cog.value}` is not loaded.", ephemeral=True)
         except Exception as e:
-            logger.error(f"Failed to unload cog {cog}: {e}")
-            await ctx.respond(f"Failed to unload `{cog}`: {e}", ephemeral=True)
+            logger.error(f"Failed to unload cog {cog.value}: {e}")
+            await interaction.followup.send(f"Failed to unload `{cog.value}`: {e}", ephemeral=True)
 
     # -------------------------------------------------------------------------
     # Sync Commands
     # -------------------------------------------------------------------------
 
     @admin.command(name="sync", description="Sync slash commands")
-    @discord.option(
-        name="scope",
-        description="Sync scope",
-        choices=["global", "guild"],
-        default="guild",
-    )
+    @app_commands.describe(scope="Sync scope")
+    @app_commands.choices(scope=[
+        app_commands.Choice(name="global", value="global"),
+        app_commands.Choice(name="guild", value="guild"),
+    ])
     async def sync(
         self,
-        ctx: discord.ApplicationContext,
-        scope: str,
+        interaction: discord.Interaction,
+        scope: Optional[app_commands.Choice[str]] = None,
     ) -> None:
         """Sync slash commands."""
-        await ctx.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
+
+        scope_val = scope.value if scope else "guild"
 
         try:
-            if scope == "global":
+            if scope_val == "global":
                 synced = await self.bot.tree.sync()
-                await ctx.respond(
+                await interaction.followup.send(
                     f"Synced {len(synced)} commands globally.",
                     ephemeral=True,
                 )
             else:
-                synced = await self.bot.tree.sync(guild=ctx.guild)
-                await ctx.respond(
+                synced = await self.bot.tree.sync(guild=interaction.guild)
+                await interaction.followup.send(
                     f"Synced {len(synced)} commands to this guild.",
                     ephemeral=True,
                 )
 
-            logger.info(f"Synced commands ({scope})", user_id=ctx.author.id)
+            logger.info(f"Synced commands ({scope_val})", user_id=interaction.user.id)
 
         except Exception as e:
             logger.error(f"Failed to sync commands: {e}")
-            await ctx.respond(f"Failed to sync: {e}", ephemeral=True)
+            await interaction.followup.send(f"Failed to sync: {e}", ephemeral=True)
 
     # -------------------------------------------------------------------------
     # Prefix Command (Prefix-based for backwards compatibility)
@@ -308,19 +318,19 @@ class Admin(commands.Cog):
     # -------------------------------------------------------------------------
 
     @admin.command(name="shutdown", description="Shutdown the bot")
-    async def shutdown(self, ctx: discord.ApplicationContext) -> None:
+    async def shutdown(self, interaction: discord.Interaction) -> None:
         """Shutdown the bot gracefully."""
         # Check if user is bot owner
         app_info = await self.bot.application_info()
-        if ctx.author.id != app_info.owner.id:
-            await ctx.respond(
+        if interaction.user.id != app_info.owner.id:
+            await interaction.response.send_message(
                 "Only the bot owner can use this command.",
                 ephemeral=True,
             )
             return
 
-        await ctx.respond("Shutting down...", ephemeral=True)
-        logger.info("Bot shutdown initiated", user_id=ctx.author.id)
+        await interaction.response.send_message("Shutting down...", ephemeral=True)
+        logger.info("Bot shutdown initiated", user_id=interaction.user.id)
 
         await self.bot.close()
 
@@ -362,6 +372,6 @@ class Admin(commands.Cog):
         logger.info("Admin cog loaded and ready")
 
 
-def setup(bot: commands.Bot) -> None:
+async def setup(bot: commands.Bot) -> None:
     """Setup function for loading the cog."""
-    bot.add_cog(Admin(bot))
+    await bot.add_cog(Admin(bot))

@@ -4,7 +4,7 @@ import asyncio
 from typing import Optional
 
 import discord
-from discord import SlashCommandGroup
+from discord import app_commands
 from discord.ext import commands, tasks
 from mcrcon import MCRcon, MCRconException
 
@@ -56,10 +56,10 @@ class Minecraft(commands.Cog):
     # Slash Command Group
     # -------------------------------------------------------------------------
 
-    mc = SlashCommandGroup(
+    mc = app_commands.Group(
         name="mc",
         description="Minecraft server commands",
-        default_member_permissions=discord.Permissions(administrator=True),
+        default_permissions=discord.Permissions(administrator=True),
     )
 
     # -------------------------------------------------------------------------
@@ -67,9 +67,9 @@ class Minecraft(commands.Cog):
     # -------------------------------------------------------------------------
 
     @mc.command(name="status", description="Get Minecraft server status")
-    async def status(self, ctx: discord.ApplicationContext) -> None:
+    async def status(self, interaction: discord.Interaction) -> None:
         """Get the current Minecraft server status."""
-        await ctx.defer()
+        await interaction.response.defer()
 
         try:
             # Get player list
@@ -125,7 +125,7 @@ class Minecraft(commands.Cog):
                     inline=False,
                 )
 
-            await ctx.respond(embed=embed)
+            await interaction.followup.send(embed=embed)
 
             # Cache status
             self._last_status = {
@@ -134,7 +134,7 @@ class Minecraft(commands.Cog):
                 "tps": tps_response,
             }
 
-            logger.info("Minecraft status checked", user_id=ctx.author.id)
+            logger.info("Minecraft status checked", user_id=interaction.user.id)
 
         except MCRconException as e:
             embed = discord.Embed(
@@ -144,7 +144,7 @@ class Minecraft(commands.Cog):
             embed.add_field(name="Status", value="Offline / Unreachable")
             embed.add_field(name="Error", value=str(e)[:200])
 
-            await ctx.respond(embed=embed)
+            await interaction.followup.send(embed=embed)
 
             self._last_status = {"online": False, "error": str(e)}
 
@@ -152,16 +152,16 @@ class Minecraft(commands.Cog):
 
         except Exception as e:
             logger.error(f"Failed to get Minecraft status: {e}")
-            await ctx.respond(f"Failed to get server status: {e}", ephemeral=True)
+            await interaction.followup.send(f"Failed to get server status: {e}", ephemeral=True)
 
     # -------------------------------------------------------------------------
     # Players Command
     # -------------------------------------------------------------------------
 
     @mc.command(name="players", description="List online players")
-    async def players(self, ctx: discord.ApplicationContext) -> None:
+    async def players(self, interaction: discord.Interaction) -> None:
         """List all online players."""
-        await ctx.defer()
+        await interaction.response.defer()
 
         try:
             response = await asyncio.to_thread(self._execute_rcon, "list")
@@ -172,30 +172,30 @@ class Minecraft(commands.Cog):
                 color=discord.Color.blue(),
             )
 
-            await ctx.respond(embed=embed)
+            await interaction.followup.send(embed=embed)
 
         except MCRconException as e:
-            await ctx.respond(
+            await interaction.followup.send(
                 f"Failed to connect to server: {e}",
                 ephemeral=True,
             )
         except Exception as e:
             logger.error(f"Failed to list players: {e}")
-            await ctx.respond(f"Failed to list players: {e}", ephemeral=True)
+            await interaction.followup.send(f"Failed to list players: {e}", ephemeral=True)
 
     # -------------------------------------------------------------------------
     # Command Execution
     # -------------------------------------------------------------------------
 
     @mc.command(name="command", description="Execute a Minecraft command")
-    @discord.option(name="cmd", description="Command to execute (without /)")
+    @app_commands.describe(cmd="Command to execute (without /)")
     async def command(
         self,
-        ctx: discord.ApplicationContext,
+        interaction: discord.Interaction,
         cmd: str,
     ) -> None:
         """Execute a command on the Minecraft server."""
-        await ctx.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
 
         # Basic command sanitization - block dangerous commands
         dangerous_commands = ["stop", "restart", "shutdown", "op", "deop", "ban-ip"]
@@ -203,7 +203,7 @@ class Minecraft(commands.Cog):
 
         for dangerous in dangerous_commands:
             if cmd_lower.startswith(dangerous):
-                await ctx.respond(
+                await interaction.followup.send(
                     f"Command `{dangerous}` is not allowed via Discord.",
                     ephemeral=True,
                 )
@@ -217,8 +217,8 @@ class Minecraft(commands.Cog):
                 await self.bot.api.create_audit_log(
                     action="minecraft_command",
                     resource="rcon",
-                    user_id=ctx.author.id,
-                    guild_id=ctx.guild_id,
+                    user_id=interaction.user.id,
+                    guild_id=interaction.guild_id,
                     details={
                         "command": cmd,
                         "response": response[:500],
@@ -241,74 +241,74 @@ class Minecraft(commands.Cog):
                 inline=False,
             )
 
-            await ctx.respond(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
             logger.info(
                 f"Minecraft command executed: {cmd}",
-                user_id=ctx.author.id,
+                user_id=interaction.user.id,
                 command=cmd,
             )
 
         except MCRconException as e:
-            await ctx.respond(
+            await interaction.followup.send(
                 f"Failed to execute command: {e}",
                 ephemeral=True,
             )
         except Exception as e:
             logger.error(f"Failed to execute Minecraft command: {e}")
-            await ctx.respond(f"Failed to execute command: {e}", ephemeral=True)
+            await interaction.followup.send(f"Failed to execute command: {e}", ephemeral=True)
 
     # -------------------------------------------------------------------------
     # Say Command
     # -------------------------------------------------------------------------
 
     @mc.command(name="say", description="Send a message to the Minecraft server")
-    @discord.option(name="message", description="Message to send")
+    @app_commands.describe(message="Message to send")
     async def say(
         self,
-        ctx: discord.ApplicationContext,
+        interaction: discord.Interaction,
         message: str,
     ) -> None:
         """Send a message to the Minecraft server chat."""
-        await ctx.defer()
+        await interaction.response.defer()
 
         # Sanitize message
         safe_message = message.replace("\\", "\\\\").replace('"', '\\"')
 
         try:
             # Use tellraw for better formatting
-            cmd = f'say [Discord] {ctx.author.name}: {safe_message}'
+            cmd = f'say [Discord] {interaction.user.name}: {safe_message}'
             await asyncio.to_thread(self._execute_rcon, cmd)
 
-            await ctx.respond(f"Message sent to Minecraft server.")
+            await interaction.followup.send("Message sent to Minecraft server.")
 
             logger.info(
                 f"Message sent to Minecraft: {message[:50]}",
-                user_id=ctx.author.id,
+                user_id=interaction.user.id,
             )
 
         except MCRconException as e:
-            await ctx.respond(
+            await interaction.followup.send(
                 f"Failed to send message: {e}",
                 ephemeral=True,
             )
         except Exception as e:
             logger.error(f"Failed to send Minecraft message: {e}")
-            await ctx.respond(f"Failed to send message: {e}", ephemeral=True)
+            await interaction.followup.send(f"Failed to send message: {e}", ephemeral=True)
 
     # -------------------------------------------------------------------------
     # Whitelist Commands
     # -------------------------------------------------------------------------
 
     @mc.command(name="whitelist-add", description="Add a player to the whitelist")
-    @discord.option(name="player", description="Player name to add")
+    @app_commands.describe(player="Player name to add")
     async def whitelist_add(
         self,
-        ctx: discord.ApplicationContext,
+        interaction: discord.Interaction,
         player: str,
     ) -> None:
         """Add a player to the server whitelist."""
-        await ctx.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
 
         try:
             response = await asyncio.to_thread(self._execute_rcon, f"whitelist add {player}")
@@ -321,22 +321,22 @@ class Minecraft(commands.Cog):
             embed.add_field(name="Player", value=player)
             embed.add_field(name="Result", value=response, inline=False)
 
-            await ctx.respond(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
-            logger.info(f"Added {player} to whitelist", user_id=ctx.author.id)
+            logger.info(f"Added {player} to whitelist", user_id=interaction.user.id)
 
         except MCRconException as e:
-            await ctx.respond(f"Failed: {e}", ephemeral=True)
+            await interaction.followup.send(f"Failed: {e}", ephemeral=True)
 
     @mc.command(name="whitelist-remove", description="Remove a player from the whitelist")
-    @discord.option(name="player", description="Player name to remove")
+    @app_commands.describe(player="Player name to remove")
     async def whitelist_remove(
         self,
-        ctx: discord.ApplicationContext,
+        interaction: discord.Interaction,
         player: str,
     ) -> None:
         """Remove a player from the server whitelist."""
-        await ctx.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
 
         try:
             response = await asyncio.to_thread(self._execute_rcon, f"whitelist remove {player}")
@@ -349,12 +349,12 @@ class Minecraft(commands.Cog):
             embed.add_field(name="Player", value=player)
             embed.add_field(name="Result", value=response, inline=False)
 
-            await ctx.respond(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
-            logger.info(f"Removed {player} from whitelist", user_id=ctx.author.id)
+            logger.info(f"Removed {player} from whitelist", user_id=interaction.user.id)
 
         except MCRconException as e:
-            await ctx.respond(f"Failed: {e}", ephemeral=True)
+            await interaction.followup.send(f"Failed: {e}", ephemeral=True)
 
     # -------------------------------------------------------------------------
     # Background Tasks
@@ -392,10 +392,10 @@ class Minecraft(commands.Cog):
         await self.bot.wait_until_ready()
 
 
-def setup(bot: commands.Bot) -> None:
+async def setup(bot: commands.Bot) -> None:
     """Setup function for loading the cog."""
     if settings.rcon_enabled:
-        bot.add_cog(Minecraft(bot))
+        await bot.add_cog(Minecraft(bot))
         logger.info("Minecraft cog loaded (RCON enabled)")
     else:
         logger.info("Minecraft cog not loaded (RCON disabled)")

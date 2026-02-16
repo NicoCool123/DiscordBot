@@ -144,5 +144,5 @@ class CustomCommands(commands.Cog):
                 logger.warning(f"Failed to sync commands for guild {guild.id}: {e}")
 
 
-def setup(bot: commands.Bot) -> None:
-    bot.add_cog(CustomCommands(bot))
+async def setup(bot: commands.Bot) -> None:
+    await bot.add_cog(CustomCommands(bot))
