@@ -74,6 +74,13 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO")
     log_format: str = Field(default="json")
 
+    # Data Retention & Privacy
+    audit_log_enabled: bool = Field(default=False, description="Enable audit logging (disable to not store any logs)")
+    audit_log_retention_days: int = Field(default=1, description="Days to keep audit logs")
+    audit_log_anonymize_after_days: int = Field(default=0, description="Days before anonymizing audit logs (0 = immediate)")
+    store_ip_addresses: bool = Field(default=False, description="Store IP addresses in audit logs")
+    store_user_agents: bool = Field(default=False, description="Store user agents in audit logs")
+
     @property
     def allowed_hosts_list(self) -> list[str]:
         """Get allowed hosts as a list."""

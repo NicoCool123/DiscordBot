@@ -3,6 +3,7 @@
 from .admin import Admin
 from .moderation import Moderation
 from .minecraft import Minecraft
-from .custom_commands import CustomCommands
+from .utility import Utility
+from .automod import AutoMod
 
-__all__ = ["Admin", "Moderation", "Minecraft", "CustomCommands"]
+__all__ = ["Admin", "Moderation", "Minecraft", "Utility", "AutoMod"]

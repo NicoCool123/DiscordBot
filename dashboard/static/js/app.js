@@ -82,7 +82,10 @@ function connectStatusWebSocket() {
             }
         },
         onClose: () => {
-            updateStatusDisplay(false);
+            // Don't set offline on WS disconnect — let HTTP polling determine status.
+            // The WS dropping only means the dashboard lost its real-time connection,
+            // not that the bot itself is offline.
+            checkBotStatus();
         }
     });
 }

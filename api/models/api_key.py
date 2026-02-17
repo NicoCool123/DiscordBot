@@ -47,12 +47,6 @@ class APIKey(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    # Usage tracking
-    last_used_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    usage_count: Mapped[int] = mapped_column(default=0)
-
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

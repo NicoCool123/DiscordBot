@@ -6,7 +6,6 @@ from .audit_log import AuditLog
 from .bot_settings import BotSettings
 from .module import Module
 from .api_key import APIKey
-from .custom_command import CustomCommand
 from .command_config import CommandConfig
 
 __all__ = [
@@ -17,6 +16,5 @@ __all__ = [
     "BotSettings",
     "Module",
     "APIKey",
-    "CustomCommand",
     "CommandConfig",
 ]

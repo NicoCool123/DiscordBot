@@ -1,6 +1,7 @@
 """API Routes Package."""
 
 from fastapi import APIRouter
+from .audit import router as audit_router
 from .auth import router as auth_router
 from .bot import router as bot_router
 from .settings import router as settings_router
@@ -12,6 +13,7 @@ from .users import router as users_router
 
 api_router = APIRouter()
 
+api_router.include_router(audit_router, prefix="/audit", tags=["Audit"])
 api_router.include_router(auth_router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(bot_router, prefix="/bot", tags=["Bot Management"])
 api_router.include_router(settings_router, prefix="/settings", tags=["Settings"])

@@ -1,3 +1,4 @@
+import asyncio
 import os
 import logging
 from contextlib import asynccontextmanager
@@ -15,6 +16,7 @@ from api.core.config import settings
 from api.core.database import init_db, close_db
 from api.core.rate_limiter import limiter
 from api.routes import api_router
+from api.tasks.cleanup import run_cleanup_scheduler
 from api.websocket.logs import router as logs_ws_router
 from api.websocket.status import router as status_ws_router
 
@@ -26,6 +28,7 @@ class Application:
 
     def __init__(self) -> None:
         self.logger = logging.getLogger("app")
+        self.cleanup_task = None
         self._configure_logging()
         self.app = FastAPI(
             title=settings.app_name,
@@ -59,8 +62,27 @@ class Application:
             self.logger.info("Database initialized")
         except Exception as e:
             self.logger.error(f"Database initialization failed: {e}")
+
+        # Start background cleanup task
+        try:
+            self.cleanup_task = asyncio.create_task(run_cleanup_scheduler())
+            self.logger.info("Background cleanup task started")
+        except Exception as e:
+            self.logger.error(f"Failed to start cleanup task: {e}")
+
         yield
+
         self.logger.info("Shutting down application...")
+
+        # Cancel cleanup task
+        if self.cleanup_task:
+            self.cleanup_task.cancel()
+            try:
+                await self.cleanup_task
+            except asyncio.CancelledError:
+                pass
+            self.logger.info("Cleanup task stopped")
+
         await close_db()
         self.logger.info("Shutdown complete")
 
@@ -136,9 +158,9 @@ class Application:
         async def metrics(request: Request):
             return self.templates.TemplateResponse("metrics.html", {"request": request, "active_page": "metrics"})
 
-        @self.app.get("/commands")
-        async def commands(request: Request):
-            return self.templates.TemplateResponse("commands.html", {"request": request, "active_page": "commands"})
+        @self.app.get("/moderation")
+        async def moderation(request: Request):
+            return self.templates.TemplateResponse("commands.html", {"request": request, "active_page": "moderation"})
 
         @self.app.get("/minecraft")
         async def minecraft(request: Request):

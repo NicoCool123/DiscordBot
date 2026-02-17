@@ -122,7 +122,8 @@ class Admin(commands.Cog):
         app_commands.Choice(name="admin", value="admin"),
         app_commands.Choice(name="moderation", value="moderation"),
         app_commands.Choice(name="minecraft", value="minecraft"),
-        app_commands.Choice(name="custom_commands", value="custom_commands"),
+        app_commands.Choice(name="utility", value="utility"),
+        app_commands.Choice(name="automod", value="automod"),
     ])
     async def reload(
         self,
@@ -180,7 +181,8 @@ class Admin(commands.Cog):
         app_commands.Choice(name="admin", value="admin"),
         app_commands.Choice(name="moderation", value="moderation"),
         app_commands.Choice(name="minecraft", value="minecraft"),
-        app_commands.Choice(name="custom_commands", value="custom_commands"),
+        app_commands.Choice(name="utility", value="utility"),
+        app_commands.Choice(name="automod", value="automod"),
     ])
     async def load(
         self,
@@ -208,6 +210,8 @@ class Admin(commands.Cog):
     @app_commands.choices(cog=[
         app_commands.Choice(name="moderation", value="moderation"),
         app_commands.Choice(name="minecraft", value="minecraft"),
+        app_commands.Choice(name="utility", value="utility"),
+        app_commands.Choice(name="automod", value="automod"),
     ])
     async def unload(
         self,

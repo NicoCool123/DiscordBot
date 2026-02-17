@@ -1,6 +1,6 @@
 """Bot management API routes."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -46,6 +46,10 @@ async def get_bot_status(
     current_user: Annotated[User, Depends(require_permission("bot:read"))],
 ) -> dict:
     """Get current bot status."""
+    # Mark as offline if the bot hasn't reported in over 10 minutes
+    stale_threshold = timedelta(minutes=10)
+    if _bot_status["online"] and (datetime.utcnow() - _bot_status["last_updated"]) > stale_threshold:
+        _bot_status["online"] = False
     return _bot_status
 
 

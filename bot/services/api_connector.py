@@ -224,11 +224,8 @@ class APIConnector:
         return await self.post("/minecraft/command", data={"command": command})
 
     # ======================================================================
-    # CUSTOM COMMANDS API
+    # COMMAND CONFIG API
     # ======================================================================
-
-    async def get_custom_commands(self, guild_id: str) -> dict[str, Any]:
-        return await self.get(f"/commands/{guild_id}")
 
     async def get_command_config(
         self, guild_id: str, command_name: str

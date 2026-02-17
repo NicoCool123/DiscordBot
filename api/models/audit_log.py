@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -43,6 +43,10 @@ class AuditLog(Base):
         DateTime(timezone=True), server_default=func.now(), index=True
     )
 
+    # Retention and privacy
+    retention_days: Mapped[int] = mapped_column(Integer, default=90)
+    anonymized: Mapped[bool] = mapped_column(Boolean, default=False)
+
     def __repr__(self) -> str:
         return f"<AuditLog(id={self.id}, action='{self.action}', resource='{self.resource}')>"
 
@@ -58,8 +62,20 @@ class AuditLog(Base):
         user_agent: Optional[str] = None,
         discord_user_id: Optional[str] = None,
         discord_guild_id: Optional[str] = None,
-    ) -> "AuditLog":
-        """Create an audit log entry."""
+    ) -> Optional["AuditLog"]:
+        """Create an audit log entry if audit logging is enabled."""
+        # Check if audit logging is enabled
+        from api.core.config import settings
+
+        if not settings.audit_log_enabled:
+            return None
+
+        # Don't store IP/User-Agent if disabled in settings
+        if not settings.store_ip_addresses:
+            ip_address = None
+        if not settings.store_user_agents:
+            user_agent = None
+
         return cls(
             action=action,
             resource=resource,
@@ -71,6 +87,19 @@ class AuditLog(Base):
             discord_user_id=discord_user_id,
             discord_guild_id=discord_guild_id,
         )
+
+    def anonymize(self) -> None:
+        """Anonymize sensitive data in audit log."""
+        self.ip_address = "0.0.0.0"
+        self.user_agent = "[ANONYMIZED]"
+        self.anonymized = True
+
+    @classmethod
+    def create_and_add(cls, db, **kwargs) -> None:
+        """Create and add audit log to session if enabled."""
+        log = cls.create(**kwargs)
+        if log:
+            db.add(log)
 
 
 # Common audit actions

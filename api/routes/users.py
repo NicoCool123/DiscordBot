@@ -4,12 +4,13 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.database import get_db
 from api.core.rate_limiter import limit_api
-from api.core.security import require_permission
+from api.core.security import get_current_active_user, require_permission
+from api.models.api_key import APIKey
 from api.models.audit_log import AuditLog, AuditActions
 from api.models.role import Role, UserRole
 from api.models.user import User
@@ -228,14 +229,15 @@ async def update_user(
         changes["role_ids"] = data.role_ids
 
     # Audit log
-    db.add(AuditLog.create(
+    AuditLog.create_and_add(
+        db,
         action=AuditActions.USER_UPDATE,
         resource="user",
         user_id=current_user.id,
         resource_id=str(user_id),
         details=changes,
         ip_address=request.client.host if request.client else None,
-    ))
+    )
 
     await db.commit()
 
@@ -279,16 +281,148 @@ async def delete_user(
     username = user.username
 
     # Audit log before delete
-    db.add(AuditLog.create(
+    AuditLog.create_and_add(
+        db,
         action=AuditActions.USER_DELETE,
         resource="user",
         user_id=current_user.id,
         resource_id=str(user_id),
         details={"username": username},
         ip_address=request.client.host if request.client else None,
-    ))
+    )
 
     await db.delete(user)
     await db.commit()
 
     return {"detail": f"User '{username}' deleted"}
+
+
+@router.get("/me/export")
+@limit_api()
+async def export_user_data(
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    """Export all user data (GDPR compliance - Article 15).
+
+    Args:
+        request: FastAPI request
+        current_user: Current authenticated user
+        db: Database session
+
+    Returns:
+        Dict containing all user data
+    """
+    # Get audit logs
+    result = await db.execute(
+        select(AuditLog).where(AuditLog.user_id == current_user.id).order_by(AuditLog.created_at.desc())
+    )
+    audit_logs = result.scalars().all()
+
+    # Get API keys
+    result = await db.execute(
+        select(APIKey).where(APIKey.user_id == current_user.id).order_by(APIKey.created_at.desc())
+    )
+    api_keys = result.scalars().all()
+
+    return {
+        "user": {
+            "id": current_user.id,
+            "username": current_user.username,
+            "email": current_user.email,
+            "display_name": current_user.display_name,
+            "discord_id": current_user.discord_id,
+            "mfa_enabled": current_user.mfa_enabled,
+            "is_active": current_user.is_active,
+            "is_superuser": current_user.is_superuser,
+            "is_verified": current_user.is_verified,
+            "created_at": current_user.created_at.isoformat(),
+            "last_login": current_user.last_login.isoformat() if current_user.last_login else None,
+        },
+        "roles": [
+            {
+                "id": role.id,
+                "name": role.name,
+                "description": role.description,
+                "permissions": role.permissions or [],
+            }
+            for role in current_user.roles
+        ],
+        "audit_logs": [
+            {
+                "action": log.action,
+                "resource": log.resource,
+                "resource_id": log.resource_id,
+                "created_at": log.created_at.isoformat(),
+                "details": log.details,
+            }
+            for log in audit_logs
+        ],
+        "api_keys": [
+            {
+                "name": key.name,
+                "description": key.description,
+                "created_at": key.created_at.isoformat(),
+                "is_active": key.is_active,
+            }
+            for key in api_keys
+        ],
+    }
+
+
+@router.delete("/me")
+@limit_api()
+async def delete_user_account(
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    confirmation: str = Query(..., description="Must be 'DELETE MY ACCOUNT'"),
+) -> dict:
+    """Delete user account and all associated data (GDPR right to erasure - Article 17).
+
+    Args:
+        request: FastAPI request
+        current_user: Current authenticated user
+        db: Database session
+        confirmation: Confirmation string (must be "DELETE MY ACCOUNT")
+
+    Returns:
+        Success message
+
+    Raises:
+        HTTPException: If confirmation is incorrect
+    """
+    if confirmation != "DELETE MY ACCOUNT":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Confirmation required: 'DELETE MY ACCOUNT'",
+        )
+
+    username = current_user.username
+
+    # Create final audit log
+    AuditLog.create_and_add(
+        db,
+        action=AuditActions.USER_DELETE,
+        resource="user",
+        user_id=current_user.id,
+        resource_id=str(current_user.id),
+        details={"username": username, "self_deletion": True},
+        ip_address=request.client.host if request.client else None,
+    )
+
+    # Delete audit logs
+    await db.execute(delete(AuditLog).where(AuditLog.user_id == current_user.id))
+
+    # Delete API keys
+    await db.execute(delete(APIKey).where(APIKey.user_id == current_user.id))
+
+    # Delete user roles
+    await db.execute(delete(UserRole).where(UserRole.user_id == current_user.id))
+
+    # Delete user
+    await db.delete(current_user)
+    await db.commit()
+
+    return {"message": f"Account '{username}' deleted successfully"}

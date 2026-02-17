@@ -55,163 +55,150 @@
     <!-- Settings Form -->
     <div x-show="selectedGuild" x-cloak>
         <form @submit.prevent="saveSettings()">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-                <!-- Left Column: Basic Settings + Features -->
-                <div class="space-y-6">
-                    <!-- Basic Settings -->
-                    <div class="card p-6">
-                        <h3 class="text-sm font-semibold text-white mb-5 flex items-center gap-2">
-                            <svg class="w-4 h-4 text-[#5865f2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
-                            </svg>
-                            Basic Settings
-                        </h3>
-                        <div class="space-y-4">
-                            <div>
-                                <label class="block text-xs font-medium text-[#94a3b8] mb-1.5">Command Prefix</label>
-                                <input
-                                    type="text"
-                                    x-model="settings.prefix"
-                                    maxlength="5"
-                                    placeholder="!"
-                                    class="input-field"
-                                >
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-[#94a3b8] mb-1.5">Language</label>
-                                <select x-model="settings.language" class="input-field">
-                                    <option value="en">English</option>
-                                    <option value="de">Deutsch</option>
-                                    <option value="fr">Francais</option>
-                                    <option value="es">Espanol</option>
-                                </select>
-                            </div>
+            <div class="max-w-md space-y-6">
+                <!-- Basic Settings -->
+                <div class="card p-6">
+                    <h3 class="text-sm font-semibold text-white mb-5 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-[#5865f2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                        </svg>
+                        Basic Settings
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-medium text-[#94a3b8] mb-1.5">Command Prefix</label>
+                            <input
+                                type="text"
+                                x-model="settings.prefix"
+                                maxlength="5"
+                                placeholder="!"
+                                class="input-field"
+                            >
                         </div>
-                    </div>
-
-                    <!-- Features -->
-                    <div class="card p-6">
-                        <h3 class="text-sm font-semibold text-white mb-5 flex items-center gap-2">
-                            <svg class="w-4 h-4 text-[#23a559]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                            </svg>
-                            Features
-                        </h3>
-                        <div class="space-y-3">
-                            <!-- Moderation Toggle -->
-                            <div class="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
-                                <div>
-                                    <p class="text-sm font-medium text-[#e2e8f0]">Moderation</p>
-                                    <p class="text-xs text-[#64748b] mt-0.5">Ban, kick, mute and warning commands</p>
-                                </div>
-                                <button type="button" @click="settings.moderation_enabled = !settings.moderation_enabled"
-                                        class="toggle" :class="settings.moderation_enabled ? 'bg-[#23a559]' : 'bg-[#64748b]/40'">
-                                    <span class="toggle-dot" :class="settings.moderation_enabled ? 'translate-x-5' : 'translate-x-1'"></span>
-                                </button>
-                            </div>
-
-                            <!-- Logging Toggle -->
-                            <div class="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
-                                <div>
-                                    <p class="text-sm font-medium text-[#e2e8f0]">Logging</p>
-                                    <p class="text-xs text-[#64748b] mt-0.5">Log member joins, leaves, and message edits</p>
-                                </div>
-                                <button type="button" @click="settings.logging_enabled = !settings.logging_enabled"
-                                        class="toggle" :class="settings.logging_enabled ? 'bg-[#23a559]' : 'bg-[#64748b]/40'">
-                                    <span class="toggle-dot" :class="settings.logging_enabled ? 'translate-x-5' : 'translate-x-1'"></span>
-                                </button>
-                            </div>
-
-                            <!-- Welcome Messages Toggle -->
-                            <div class="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
-                                <div>
-                                    <p class="text-sm font-medium text-[#e2e8f0]">Welcome Messages</p>
-                                    <p class="text-xs text-[#64748b] mt-0.5">Greet new members automatically</p>
-                                </div>
-                                <button type="button" @click="settings.welcome_enabled = !settings.welcome_enabled"
-                                        class="toggle" :class="settings.welcome_enabled ? 'bg-[#23a559]' : 'bg-[#64748b]/40'">
-                                    <span class="toggle-dot" :class="settings.welcome_enabled ? 'translate-x-5' : 'translate-x-1'"></span>
-                                </button>
-                            </div>
+                        <div>
+                            <label class="block text-xs font-medium text-[#94a3b8] mb-1.5">Language</label>
+                            <select x-model="settings.language" class="input-field">
+                                <option value="en">English</option>
+                                <option value="de">Deutsch</option>
+                                <option value="fr">Francais</option>
+                                <option value="es">Espanol</option>
+                            </select>
                         </div>
                     </div>
                 </div>
 
-                <!-- Right Column: Channels + Welcome Message -->
-                <div class="space-y-6">
-                    <!-- Channels -->
-                    <div class="card p-6">
-                        <h3 class="text-sm font-semibold text-white mb-5 flex items-center gap-2">
-                            <svg class="w-4 h-4 text-[#f0b232]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
-                            </svg>
-                            Channels
-                        </h3>
-                        <div class="space-y-4">
+                <!-- Feature Toggles -->
+                <div class="card p-6">
+                    <h3 class="text-sm font-semibold text-white mb-5 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-[#5865f2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Features
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
                             <div>
-                                <label class="block text-xs font-medium text-[#94a3b8] mb-1.5">Log Channel ID</label>
-                                <div class="relative">
-                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[#64748b] text-sm font-medium">#</span>
-                                    <input
-                                        type="text"
-                                        x-model="settings.log_channel_id"
-                                        placeholder="Channel ID"
-                                        class="input-field pl-7"
-                                    >
-                                </div>
+                                <span class="text-sm text-[#e2e8f0]">Moderation</span>
+                                <p class="text-xs text-[#64748b] mt-0.5">Enable moderation commands</p>
                             </div>
+                            <button type="button" @click="settings.moderation_enabled = !settings.moderation_enabled"
+                                    class="toggle" :class="settings.moderation_enabled ? 'bg-[#23a559]' : 'bg-[#64748b]/40'">
+                                <span class="toggle-dot" :class="settings.moderation_enabled ? 'translate-x-5' : 'translate-x-1'"></span>
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between">
                             <div>
-                                <label class="block text-xs font-medium text-[#94a3b8] mb-1.5">Mod Log Channel ID</label>
-                                <div class="relative">
-                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[#64748b] text-sm font-medium">#</span>
-                                    <input
-                                        type="text"
-                                        x-model="settings.mod_log_channel_id"
-                                        placeholder="Channel ID"
-                                        class="input-field pl-7"
-                                    >
-                                </div>
+                                <span class="text-sm text-[#e2e8f0]">Logging</span>
+                                <p class="text-xs text-[#64748b] mt-0.5">Log moderation actions</p>
                             </div>
+                            <button type="button" @click="settings.logging_enabled = !settings.logging_enabled"
+                                    class="toggle" :class="settings.logging_enabled ? 'bg-[#23a559]' : 'bg-[#64748b]/40'">
+                                <span class="toggle-dot" :class="settings.logging_enabled ? 'translate-x-5' : 'translate-x-1'"></span>
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between">
                             <div>
-                                <label class="block text-xs font-medium text-[#94a3b8] mb-1.5">Welcome Channel ID</label>
-                                <div class="relative">
-                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[#64748b] text-sm font-medium">#</span>
-                                    <input
-                                        type="text"
-                                        x-model="settings.welcome_channel_id"
-                                        placeholder="Channel ID"
-                                        class="input-field pl-7"
-                                    >
-                                </div>
+                                <span class="text-sm text-[#e2e8f0]">Welcome Messages</span>
+                                <p class="text-xs text-[#64748b] mt-0.5">Send welcome/leave messages</p>
                             </div>
+                            <button type="button" @click="settings.welcome_enabled = !settings.welcome_enabled"
+                                    class="toggle" :class="settings.welcome_enabled ? 'bg-[#23a559]' : 'bg-[#64748b]/40'">
+                                <span class="toggle-dot" :class="settings.welcome_enabled ? 'translate-x-5' : 'translate-x-1'"></span>
+                            </button>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Welcome Message -->
-                    <div class="card p-6" x-show="settings.welcome_enabled"
-                         x-transition:enter="transition ease-out duration-200"
-                         x-transition:enter-start="opacity-0 -translate-y-2"
-                         x-transition:enter-end="opacity-100 translate-y-0"
-                         x-transition:leave="transition ease-in duration-150"
-                         x-transition:leave-start="opacity-100 translate-y-0"
-                         x-transition:leave-end="opacity-0 -translate-y-2">
-                        <h3 class="text-sm font-semibold text-white mb-5 flex items-center gap-2">
-                            <svg class="w-4 h-4 text-[#eb459e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
-                            </svg>
-                            Welcome Message
-                        </h3>
-                        <textarea
-                            x-model="settings.welcome_message"
-                            rows="4"
-                            placeholder="Welcome {user} to {server}!"
-                            class="input-field resize-none"
-                        ></textarea>
-                        <p class="text-xs text-[#64748b] mt-2">
-                            Use <code class="px-1.5 py-0.5 rounded-md bg-white/[0.06] text-[#5865f2] font-mono text-[11px]">{user}</code> for username,
-                            <code class="px-1.5 py-0.5 rounded-md bg-white/[0.06] text-[#5865f2] font-mono text-[11px]">{server}</code> for server name
-                        </p>
+                <!-- Channel Configuration -->
+                <div class="card p-6">
+                    <h3 class="text-sm font-semibold text-white mb-5 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-[#5865f2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
+                        </svg>
+                        Channels
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-medium text-[#94a3b8] mb-1.5">Log Channel ID</label>
+                            <input type="text" x-model="settings.log_channel_id" placeholder="1234567890" class="input-field">
+                            <p class="text-xs text-[#64748b] mt-1">Channel for general bot logs</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-[#94a3b8] mb-1.5">Moderation Log Channel ID</label>
+                            <input type="text" x-model="settings.mod_log_channel_id" placeholder="1234567890" class="input-field">
+                            <p class="text-xs text-[#64748b] mt-1">Channel for moderation action logs</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-[#94a3b8] mb-1.5">Welcome Channel ID</label>
+                            <input type="text" x-model="settings.welcome_channel_id" placeholder="1234567890" class="input-field">
+                            <p class="text-xs text-[#64748b] mt-1">Channel for welcome/leave messages</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Role Configuration -->
+                <div class="card p-6">
+                    <h3 class="text-sm font-semibold text-white mb-5 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-[#5865f2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                        </svg>
+                        Roles
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-medium text-[#94a3b8] mb-1.5">Auto-Role ID</label>
+                            <input type="text" x-model="settings.auto_role_id" placeholder="1234567890" class="input-field">
+                            <p class="text-xs text-[#64748b] mt-1">Role automatically assigned to new members</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-[#94a3b8] mb-1.5">Mute Role ID</label>
+                            <input type="text" x-model="settings.mute_role_id" placeholder="1234567890" class="input-field">
+                            <p class="text-xs text-[#64748b] mt-1">Role used for muting members</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Welcome Messages -->
+                <div x-show="settings.welcome_enabled" class="card p-6">
+                    <h3 class="text-sm font-semibold text-white mb-5 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-[#5865f2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                        </svg>
+                        Messages
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-medium text-[#94a3b8] mb-1.5">Welcome Message</label>
+                            <textarea x-model="settings.welcome_message" rows="3" maxlength="2000"
+                                      placeholder="Welcome {user} to {server}!" class="input-field resize-none"></textarea>
+                            <p class="text-xs text-[#64748b] mt-1">Use {user} for mention, {server} for server name</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-[#94a3b8] mb-1.5">Leave Message</label>
+                            <textarea x-model="settings.leave_message" rows="3" maxlength="2000"
+                                      placeholder="{user} has left {server}." class="input-field resize-none"></textarea>
+                            <p class="text-xs text-[#64748b] mt-1">Use {user} for username, {server} for server name</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -271,9 +258,12 @@ function settingsPage() {
         logging_enabled: true,
         welcome_enabled: false,
         log_channel_id: '',
-        mod_log_channel_id: '',
         welcome_channel_id: '',
+        mod_log_channel_id: '',
+        auto_role_id: '',
+        mute_role_id: '',
         welcome_message: '',
+        leave_message: '',
     };
 
     return {
@@ -284,7 +274,6 @@ function settingsPage() {
         loading: true,
         saving: false,
         error: '',
-        success: '',
         _previousGuild: '',
 
         get hasUnsavedChanges() {
@@ -330,7 +319,13 @@ function settingsPage() {
                 const res = await Auth.fetch(`/api/v1/settings/${this.selectedGuild}`);
                 if (res.ok) {
                     const data = await res.json();
-                    this.settings = { ...defaultSettings, ...data };
+                    // Map ALL fields from API response
+                    this.settings = { ...defaultSettings };
+                    for (const key of Object.keys(defaultSettings)) {
+                        if (data[key] !== undefined && data[key] !== null) {
+                            this.settings[key] = data[key];
+                        }
+                    }
                     this.originalSettings = { ...this.settings };
                 } else if (res.status === 404) {
                     this.settings = { ...defaultSettings };
@@ -356,7 +351,7 @@ function settingsPage() {
                     res = await Auth.fetch(`/api/v1/settings/${this.selectedGuild}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(this.settings)
+                        body: JSON.stringify({ guild_id: this.selectedGuild, ...this.settings })
                     });
                 }
 
