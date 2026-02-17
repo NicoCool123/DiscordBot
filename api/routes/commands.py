@@ -91,6 +91,7 @@ BUILTIN_COMMANDS: list[dict] = [
     {"name": "util avatar", "description": "Show user avatar", "cog": "utility"},
     {"name": "util ping", "description": "Check bot latency", "cog": "utility"},
     {"name": "util poll", "description": "Create a poll", "cog": "utility"},
+    {"name": "util deletedata", "description": "Delete all your data (GDPR)", "cog": "utility"},
     # Auto-moderation commands
     {"name": "automod filter-add", "description": "Add word to filter", "cog": "automod"},
     {"name": "automod filter-remove", "description": "Remove word from filter", "cog": "automod"},

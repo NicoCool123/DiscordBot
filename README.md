@@ -25,6 +25,23 @@ An enterprise Discord bot with a FastAPI REST API backend, a real-time web dashb
 - **Monitoring:** Prometheus, Grafana
 - **Deployment:** Docker Compose, systemd, Nginx
 
+## 🔒 Privacy & Data Protection
+
+**GDPR-Compliant Data Management:**
+- ✅ **Minimal Data Collection** - Only essential data is stored
+- ✅ **Configurable Audit Logging** - Can be completely disabled
+- ✅ **Data Retention Policies** - Automatic cleanup after 1-90 days
+- ✅ **Right to Access** - Export all your data via API or Dashboard
+- ✅ **Right to Erasure** - Delete all data via Discord (`/util deletedata`) or Dashboard
+- ✅ **No IP/User-Agent Tracking** - Configurable via `.env`
+
+**Delete Your Data:**
+- **Discord:** `/util deletedata` command
+- **Dashboard:** Privacy & Data page
+- **API:** `DELETE /api/v1/users/me?confirmation=DELETE MY ACCOUNT`
+
+See [PRIVACY.md](PRIVACY.md) for full documentation.
+
 ## Prerequisites
 
 - Python 3.11+

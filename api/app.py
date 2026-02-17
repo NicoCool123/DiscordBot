@@ -170,6 +170,10 @@ class Application:
         async def users(request: Request):
             return self.templates.TemplateResponse("users.html", {"request": request, "active_page": "users"})
 
+        @self.app.get("/privacy")
+        async def privacy(request: Request):
+            return self.templates.TemplateResponse("privacy.html", {"request": request, "active_page": "privacy"})
+
         @self.app.get("/logout")
         async def logout():
             return RedirectResponse(url="/login")

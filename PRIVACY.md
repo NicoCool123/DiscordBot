@@ -137,13 +137,29 @@ python -m bot.main
 
 ## 🗑️ Daten manuell löschen
 
+### ⚡ NEU: Daten löschen via Discord
+
+**Slash Command in Discord:**
+```
+/util deletedata
+```
+
+Der Bot fragt nach Bestätigung (`DELETE MY ACCOUNT`) und löscht dann **alle deine Daten** permanent.
+
+### ⚡ NEU: Daten löschen via Dashboard
+
+1. Gehe zu **Privacy & Data** in der Navigation
+2. Scrolle zu "Delete All Your Data"
+3. Gib `DELETE MY ACCOUNT` ein
+4. Klicke auf "Delete My Account Permanently"
+
 ### Alle Audit Logs löschen (Admin)
 
 ```bash
 POST /api/v1/audit/cleanup?days=0
 ```
 
-### Eigenen Account + alle Daten löschen
+### Eigenen Account + alle Daten löschen (API)
 
 ```bash
 DELETE /api/v1/users/me?confirmation=DELETE MY ACCOUNT

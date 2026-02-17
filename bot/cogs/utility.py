@@ -178,6 +178,80 @@ class Utility(commands.Cog):
         for i in range(len(options)):
             await message.add_reaction(reactions[i])
 
+    @util.command(name="deletedata", description="Delete all your data from the bot")
+    async def deletedata(self, interaction: discord.Interaction) -> None:
+        """Delete all user data (GDPR right to erasure)."""
+        # Create confirmation embed
+        embed = discord.Embed(
+            title="⚠️ Delete All Your Data",
+            description=(
+                "This will **permanently delete**:\n"
+                "• Your user account\n"
+                "• All audit logs\n"
+                "• All API keys\n"
+                "• All role assignments\n\n"
+                "**This action cannot be undone!**\n\n"
+                "To confirm, type: `DELETE MY ACCOUNT`"
+            ),
+            color=discord.Color.red(),
+        )
+        embed.set_footer(text="This is a GDPR-compliant data deletion.")
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        # Wait for confirmation message
+        def check(m):
+            return (
+                m.author.id == interaction.user.id
+                and m.channel.id == interaction.channel.id
+                and m.content == "DELETE MY ACCOUNT"
+            )
+
+        try:
+            await self.bot.wait_for("message", timeout=60.0, check=check)
+
+            # User confirmed, proceed with deletion
+            if not self.bot.api:
+                await interaction.followup.send(
+                    "❌ API connection not available. Cannot delete data.",
+                    ephemeral=True,
+                )
+                return
+
+            try:
+                # Call API to delete account
+                response = await self.bot.api.delete(
+                    "/users/me",
+                    params={"confirmation": "DELETE MY ACCOUNT"},
+                )
+
+                if response.status_code == 200:
+                    await interaction.followup.send(
+                        "✅ **All your data has been permanently deleted.**\n\n"
+                        "Your account has been removed from the system. "
+                        "You will need to create a new account to use the dashboard again.",
+                        ephemeral=True,
+                    )
+                    logger.info(
+                        f"User {interaction.user.id} deleted their account via Discord"
+                    )
+                else:
+                    await interaction.followup.send(
+                        f"❌ Failed to delete data: {response.text}", ephemeral=True
+                    )
+
+            except Exception as e:
+                logger.error(f"Failed to delete user data: {e}")
+                await interaction.followup.send(
+                    "❌ An error occurred while deleting your data. Please try again or contact an administrator.",
+                    ephemeral=True,
+                )
+
+        except TimeoutError:
+            await interaction.followup.send(
+                "⏱️ Confirmation timeout. Data deletion cancelled.", ephemeral=True
+            )
+
 
 async def setup(bot: commands.Bot) -> None:
     """Setup function for loading the cog."""

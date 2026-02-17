@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block title %}Privacy & Data{% endblock %}
+{% block page_title %}Privacy & Data Management{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl space-y-6" x-data="privacyPage()">
+
+    <!-- Privacy Overview -->
+    <div class="card p-6">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-9 h-9 rounded-xl bg-[#5865f2]/10 flex items-center justify-center flex-shrink-0">
+                <svg class="w-[18px] h-[18px] text-[#5865f2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-sm font-semibold text-white">Your Privacy</h3>
+                <p class="text-xs text-[#64748b]">Manage your data and privacy settings</p>
+            </div>
+        </div>
+
+        <div class="space-y-3 text-sm text-[#94a3b8]">
+            <p>We only collect the minimum data necessary for the bot to function:</p>
+            <ul class="list-disc list-inside space-y-1 ml-2">
+                <li>Your username, email, and login credentials</li>
+                <li>Discord ID for OAuth authentication</li>
+                <li>Bot settings for your servers</li>
+                <li>API keys (if you created any)</li>
+            </ul>
+            <p class="text-[#64748b] text-xs mt-3">
+                📖 Read our full privacy policy in <code class="bg-[#1e293b] px-1.5 py-0.5 rounded">PRIVACY.md</code>
+            </p>
+        </div>
+    </div>
+
+    <!-- Data Export -->
+    <div class="card p-6">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-9 h-9 rounded-xl bg-[#23a559]/10 flex items-center justify-center flex-shrink-0">
+                <svg class="w-[18px] h-[18px] text-[#23a559]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-sm font-semibold text-white">Export Your Data</h3>
+                <p class="text-xs text-[#64748b]">Download all data we have about you (GDPR Article 15)</p>
+            </div>
+        </div>
+
+        <p class="text-sm text-[#94a3b8] mb-4">
+            Get a complete copy of all your data in JSON format, including your profile, audit logs, and API keys.
+        </p>
+
+        <button @click="exportData()" class="btn btn-primary text-sm" :disabled="exporting">
+            <svg x-show="!exporting" class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+            <svg x-show="exporting" x-cloak class="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <span x-text="exporting ? 'Exporting...' : 'Export My Data'"></span>
+        </button>
+    </div>
+
+    <!-- Data Deletion -->
+    <div class="card p-6 border-2 border-[#f23f43]/20">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-9 h-9 rounded-xl bg-[#f23f43]/10 flex items-center justify-center flex-shrink-0">
+                <svg class="w-[18px] h-[18px] text-[#f23f43]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-sm font-semibold text-white">Delete All Your Data</h3>
+                <p class="text-xs text-[#f23f43]">Permanent deletion - This cannot be undone! (GDPR Article 17)</p>
+            </div>
+        </div>
+
+        <div class="bg-[#1e293b] border border-[#f23f43]/20 rounded-lg p-4 mb-4">
+            <p class="text-sm font-semibold text-[#f23f43] mb-2">⚠️ Warning: This will permanently delete:</p>
+            <ul class="list-disc list-inside space-y-1 text-sm text-[#94a3b8] ml-2">
+                <li>Your user account and login credentials</li>
+                <li>All audit logs associated with your account</li>
+                <li>All API keys you created</li>
+                <li>All role assignments</li>
+                <li>You will be logged out and cannot undo this action</li>
+            </ul>
+        </div>
+
+        <div class="space-y-3">
+            <div>
+                <label class="block text-xs font-medium text-[#94a3b8] mb-1.5">
+                    Type <code class="bg-[#1e293b] px-1.5 py-0.5 rounded text-[#f23f43]">DELETE MY ACCOUNT</code> to confirm
+                </label>
+                <input
+                    type="text"
+                    x-model="deleteConfirmation"
+                    placeholder="DELETE MY ACCOUNT"
+                    class="input-field font-mono"
+                    @input="deleteConfirmation = $event.target.value"
+                >
+            </div>
+
+            <button
+                @click="deleteAccount()"
+                class="btn bg-[#f23f43] hover:bg-[#d63940] text-white text-sm"
+                :disabled="deleting || deleteConfirmation !== 'DELETE MY ACCOUNT'"
+            >
+                <svg x-show="!deleting" class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+                <svg x-show="deleting" x-cloak class="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                <span x-text="deleting ? 'Deleting...' : 'Delete My Account Permanently'"></span>
+            </button>
+        </div>
+    </div>
+
+    <!-- GDPR Information -->
+    <div class="card p-6">
+        <h3 class="text-sm font-semibold text-white mb-3">Your GDPR Rights</h3>
+        <div class="space-y-2 text-sm text-[#94a3b8]">
+            <div class="flex items-start gap-2">
+                <span class="text-[#5865f2] mt-0.5">✓</span>
+                <div>
+                    <strong class="text-white">Right to Access:</strong> Export your data at any time
+                </div>
+            </div>
+            <div class="flex items-start gap-2">
+                <span class="text-[#5865f2] mt-0.5">✓</span>
+                <div>
+                    <strong class="text-white">Right to Erasure:</strong> Delete your data permanently
+                </div>
+            </div>
+            <div class="flex items-start gap-2">
+                <span class="text-[#5865f2] mt-0.5">✓</span>
+                <div>
+                    <strong class="text-white">Right to Portability:</strong> Download data in JSON format
+                </div>
+            </div>
+            <div class="flex items-start gap-2">
+                <span class="text-[#5865f2] mt-0.5">✓</span>
+                <div>
+                    <strong class="text-white">Data Minimization:</strong> We only collect what's necessary
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function privacyPage() {
+    return {
+        exporting: false,
+        deleting: false,
+        deleteConfirmation: '',
+
+        async exportData() {
+            this.exporting = true;
+            try {
+                const res = await Auth.fetch('/api/v1/users/me/export');
+                if (res.ok) {
+                    const data = await res.json();
+
+                    // Download as JSON file
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `my-data-export-${new Date().toISOString().split('T')[0]}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+
+                    showToast('Data exported successfully', 'success');
+                } else {
+                    const error = await res.json();
+                    showToast(error.detail || 'Failed to export data', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to export data', 'error');
+            } finally {
+                this.exporting = false;
+            }
+        },
+
+        async deleteAccount() {
+            if (this.deleteConfirmation !== 'DELETE MY ACCOUNT') {
+                showToast('Please type the confirmation text exactly', 'error');
+                return;
+            }
+
+            if (!confirm('Are you ABSOLUTELY SURE? This will permanently delete all your data and log you out. This action CANNOT be undone!')) {
+                return;
+            }
+
+            this.deleting = true;
+            try {
+                const res = await Auth.fetch('/api/v1/users/me?confirmation=DELETE MY ACCOUNT', {
+                    method: 'DELETE',
+                });
+
+                if (res.ok) {
+                    showToast('Your account has been permanently deleted', 'success');
+
+                    // Clear auth and redirect to login after 2 seconds
+                    setTimeout(() => {
+                        localStorage.removeItem('access_token');
+                        localStorage.removeItem('refresh_token');
+                        window.location.href = '/login';
+                    }, 2000);
+                } else {
+                    const error = await res.json();
+                    showToast(error.detail || 'Failed to delete account', 'error');
+                    this.deleting = false;
+                }
+            } catch (e) {
+                showToast('Failed to delete account', 'error');
+                this.deleting = false;
+            }
+        }
+    };
+}
+</script>
+{% endblock %}
